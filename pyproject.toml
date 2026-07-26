@@ -38,10 +38,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OWNER/REPOSITORY"
-Repository = "https://github.com/OWNER/REPOSITORY"
-Issues = "https://github.com/OWNER/REPOSITORY/issues"
-Changelog = "https://github.com/OWNER/REPOSITORY/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/matteobroketa/filecommit"
+Repository = "https://github.com/matteobroketa/filecommit"
+Issues = "https://github.com/matteobroketa/filecommit/issues"
+Changelog = "https://github.com/matteobroketa/filecommit/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
