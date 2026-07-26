@@ -21,6 +21,36 @@ The only irreversible step is step 10. Failures before it leave the existing
 target unchanged. A failure in step 11 raises `DirectorySyncError`, explicitly
 reporting that the replacement is already committed.
 
+## Transaction states
+
+```text
+entry
+  |
+  v
+validate target -> create private staging -> caller writes -> flush/sync/permissions
+  |                    |                       |                 |
+  | failure            | failure               | body/failure    | failure
+  +--------------------+-----------------------+-----------------+
+                                      |
+                                      v
+                              close and remove staging
+                                      |
+                                      v
+                         target remains old (or absent)
+
+flush/sync/permissions -> close staging -> os.replace -> sync parent directory
+                                                   |                 |
+                                                   |                 | failure
+                                                   v                 v
+                                           target is new       target is new;
+                                                           DirectorySyncError
+```
+
+The fault matrix exercises every displayed pre-replacement failure boundary.
+Cleanup failures are reported as warnings without replacing an active body or
+commit exception. Parent-directory synchronization is the only tested
+post-replacement failure and therefore always reports committed state.
+
 ## Why same-directory staging
 
 Replacement must not cross filesystem boundaries. Creating the staging file in
