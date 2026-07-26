@@ -20,6 +20,7 @@ from filecommit import (
     replace_bytes,
     replace_text,
 )
+from filecommit._core import _replace
 
 
 class FileCommitTests(unittest.TestCase):
@@ -381,10 +382,10 @@ class FileCommitTests(unittest.TestCase):
         self.assertIn(target.read_bytes(), payloads)
         self.assertEqual(self.staging_files(), [])
 
-    def test_windows_replace_retries_transient_sharing_violation(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows sharing semantics required")
+    def test_replace_retries_transient_windows_sharing_violation(self) -> None:
         target = self.root / "target.txt"
+        staging = self.root / "staging.txt"
+        staging.write_text("new", encoding="utf-8")
         real_replace = os.replace
         calls = 0
 
@@ -395,9 +396,10 @@ class FileCommitTests(unittest.TestCase):
                 raise PermissionError(errno.EACCES, "sharing violation")
             real_replace(source, destination)
 
-        with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
-            with mock.patch("filecommit._core.time.sleep") as sleep:
-                replace_text(target, "new")
+        with mock.patch("filecommit._core.os.name", "nt"):
+            with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
+                with mock.patch("filecommit._core.time.sleep") as sleep:
+                    _replace(staging, target)
         self.assertEqual(calls, 2)
         sleep.assert_called_once_with(0.01)
         self.assertEqual(target.read_text(encoding="utf-8"), "new")

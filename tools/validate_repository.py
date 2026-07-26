@@ -94,8 +94,8 @@ def _validate_metadata(errors: list[str]) -> None:
         errors.append("requires-python must remain exactly '>=3.9'")
     if not re.search(r"^dependencies\s*=\s*\[\s*\]\s*$", text, re.MULTILINE):
         errors.append("runtime dependencies must remain an explicit empty list")
-    if 'requires = ["setuptools==83.0.0"]' not in text:
-        errors.append("build backend dependency must remain pinned to setuptools==83.0.0")
+    if 'requires = ["setuptools==82.0.1"]' not in text:
+        errors.append("build backend dependency must remain pinned to setuptools==82.0.1")
     expected_tools = (
         '"build==1.5.0"',
         '"coverage==7.15.2"',
