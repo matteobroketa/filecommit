@@ -59,9 +59,10 @@ extend-exclude = ["build", "dist"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "SIM", "RUF"]
+ignore = ["SIM105", "SIM117"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict = true
 files = ["src/filecommit"]
 exclude = ["build", "dist"]

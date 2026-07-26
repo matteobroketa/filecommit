@@ -130,9 +130,7 @@ def validate_sdist(path: Path, *, version: str) -> None:
             raise DistributionValidationError("source archive has an unexpected top-level path")
 
         relative_names = {
-            name[len(prefix) :]
-            for name in names
-            if name.startswith(prefix) and name != prefix
+            name[len(prefix) :] for name in names if name.startswith(prefix) and name != prefix
         }
         missing = _EXPECTED_SDIST_FILES.difference(relative_names)
         if missing:
@@ -143,9 +141,7 @@ def _archive_payload(path: Path) -> Mapping[str, bytes]:
     if path.suffix == ".whl":
         with zipfile.ZipFile(path) as archive:
             return {
-                name: archive.read(name)
-                for name in archive.namelist()
-                if not name.endswith("/")
+                name: archive.read(name) for name in archive.namelist() if not name.endswith("/")
             }
     with tarfile.open(path, "r:gz") as archive:
         prefix = archive.getmembers()[0].name.split("/", 1)[0] + "/"

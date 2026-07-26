@@ -17,9 +17,7 @@ except ModuleNotFoundError:  # Running as ``python tools/rebuild_from_sdist.py``
     from validate_dist import compare_archives
 
 
-def resolve_distributions(
-    path: Path, reference_wheel: Optional[Path] = None
-) -> Tuple[Path, Path]:
+def resolve_distributions(path: Path, reference_wheel: Optional[Path] = None) -> Tuple[Path, Path]:
     """Resolve an sdist and reference wheel from paths or one directory."""
 
     if path.is_dir():

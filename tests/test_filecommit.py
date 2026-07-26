@@ -84,10 +84,9 @@ class FileCommitTests(unittest.TestCase):
 
     def test_body_exception_leaves_absent_target_absent(self) -> None:
         target = self.root / "config.txt"
-        with self.assertRaises(RuntimeError):
-            with atomic_open(target, "w") as staged:
-                staged.write("new")
-                raise RuntimeError
+        with self.assertRaises(RuntimeError), atomic_open(target, "w") as staged:
+            staged.write("new")
+            raise RuntimeError
         self.assertFalse(target.exists())
         self.assertEqual(self.staging_files(), [])
 
@@ -283,9 +282,8 @@ class FileCommitTests(unittest.TestCase):
         operation = atomic_open(target, "w")
         with operation as staged:
             staged.write("new")
-        with self.assertRaisesRegex(RuntimeError, "only once"):
-            with operation:
-                pass
+        with self.assertRaisesRegex(RuntimeError, "only once"), operation:
+            pass
 
     def test_replace_failure_preserves_target_and_cleans_staging(self) -> None:
         target = self.root / "target.txt"
@@ -382,6 +380,27 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertIn(target.read_bytes(), payloads)
         self.assertEqual(self.staging_files(), [])
+
+    def test_windows_replace_retries_transient_sharing_violation(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows sharing semantics required")
+        target = self.root / "target.txt"
+        real_replace = os.replace
+        calls = 0
+
+        def fail_once(source: object, destination: object) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise PermissionError(errno.EACCES, "sharing violation")
+            real_replace(source, destination)
+
+        with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
+            with mock.patch("filecommit._core.time.sleep") as sleep:
+                replace_text(target, "new")
+        self.assertEqual(calls, 2)
+        sleep.assert_called_once_with(0.01)
+        self.assertEqual(target.read_text(encoding="utf-8"), "new")
 
     def test_cleanup_failure_does_not_mask_body_exception(self) -> None:
         target = self.root / "target.txt"

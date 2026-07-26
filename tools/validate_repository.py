@@ -64,8 +64,7 @@ def _repository_files() -> Iterable[Path]:
             continue
         relative = path.relative_to(ROOT)
         ignored = any(
-            part in _IGNORED_DIRECTORIES or part.endswith(".egg-info")
-            for part in relative.parts
+            part in _IGNORED_DIRECTORIES or part.endswith(".egg-info") for part in relative.parts
         )
         if ignored:
             continue
@@ -111,36 +110,36 @@ def _validate_metadata(errors: list[str]) -> None:
 def _validate_workflow_architecture(errors: list[str]) -> None:
     required_fragments = {
         "ci.yml": (
-            'os: [ubuntu-latest, macos-latest, windows-latest]',
+            "os: [ubuntu-latest, macos-latest, windows-latest]",
             'python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]',
-            'python -m coverage report --fail-under=95',
-            'python tools/install_smoke.py dist',
-            'python tools/rebuild_from_sdist.py dist',
-            'python tools/stress_atomicity.py',
-            'name: Required',
+            "python -m coverage report --fail-under=95",
+            "python tools/install_smoke.py dist",
+            "python tools/rebuild_from_sdist.py dist",
+            "python tools/stress_atomicity.py",
+            "name: Required",
         ),
         "security.yml": (
-            'language: [python, actions]',
-            'queries: security-extended',
-            'actions/dependency-review-action@',
-            'github/codeql-action/init@',
-            'github/codeql-action/analyze@',
-            'name: Required',
+            "language: [python, actions]",
+            "queries: security-extended",
+            "actions/dependency-review-action@",
+            "github/codeql-action/init@",
+            "github/codeql-action/analyze@",
+            "name: Required",
         ),
         "extended.yml": (
-            'python tools/repeat_tests.py --runs 15',
-            'python tools/stress_atomicity.py',
-            '--compare-directory dist-second',
+            "python tools/repeat_tests.py --runs 15",
+            "python tools/stress_atomicity.py",
+            "--compare-directory dist-second",
         ),
         "release.yml": (
             'test "$(git cat-file -t "$GITHUB_REF")" = "tag"',
             'git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main',
-            'os: [ubuntu-latest, macos-latest, windows-latest]',
+            "os: [ubuntu-latest, macos-latest, windows-latest]",
             'python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]',
-            'actions/attest@',
-            'pypa/gh-action-pypi-publish@',
-            'name: pypi',
-            'skip-existing: ${{ github.run_attempt > 1 }}',
+            "actions/attest@",
+            "pypa/gh-action-pypi-publish@",
+            "name: pypi",
+            "skip-existing: ${{ github.run_attempt > 1 }}",
         ),
     }
 
@@ -174,7 +173,6 @@ def _validate_workflow_architecture(errors: list[str]) -> None:
         block = release.split(start_marker, 1)[1].split(end_marker, 1)[0]
         if "actions/checkout@" in block:
             errors.append(f"release job {job!r} must not check out repository source")
-
 
 
 def _validate_python_39_syntax(errors: list[str]) -> None:

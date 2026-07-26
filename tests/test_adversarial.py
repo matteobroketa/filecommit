@@ -12,8 +12,8 @@ from pathlib import Path
 from unittest import mock
 
 from filecommit import (
-    UnsupportedDurabilityError,
     UnsafeTargetError,
+    UnsupportedDurabilityError,
     atomic_open,
     replace_bytes,
     replace_text,
@@ -54,17 +54,27 @@ class AdversarialTests(unittest.TestCase):
     def test_close_failure_does_not_mask_body_exception(self) -> None:
         target = self.root / "target.txt"
         body_error = RuntimeError("body")
+        real_fdopen = os.fdopen
 
         class FailingCloseFile:
-            closed = False
+            def __init__(self, file_object: object) -> None:
+                self.file_object = file_object
+
+            @property
+            def closed(self) -> bool:
+                return self.file_object.closed  # type: ignore[union-attr]
 
             def write(self, value: str) -> int:
-                return len(value)
+                return self.file_object.write(value)  # type: ignore[union-attr,no-any-return]
 
             def close(self) -> None:
+                self.file_object.close()  # type: ignore[union-attr]
                 raise OSError(errno.EIO, "close failed")
 
-        with mock.patch("filecommit._core.os.fdopen", return_value=FailingCloseFile()):
+        def failing_fdopen(fd: int, *_args: object, **_kwargs: object) -> FailingCloseFile:
+            return FailingCloseFile(real_fdopen(fd, "w", encoding="utf-8"))
+
+        with mock.patch("filecommit._core.os.fdopen", side_effect=failing_fdopen):
             with self.assertRaises(RuntimeError) as raised:
                 with atomic_open(target, "w") as staged:
                     staged.write("new")
@@ -157,10 +167,9 @@ class AdversarialTests(unittest.TestCase):
 
     def test_target_becoming_directory_during_write_is_refused(self) -> None:
         target = self.root / "target"
-        with self.assertRaises(UnsafeTargetError):
-            with atomic_open(target, "w") as staged:
-                staged.write("new")
-                target.mkdir()
+        with self.assertRaises(UnsafeTargetError), atomic_open(target, "w") as staged:
+            staged.write("new")
+            target.mkdir()
         self.assertTrue(target.is_dir())
         self.assertEqual(self.staging_files(), [])
 
@@ -184,10 +193,9 @@ class AdversarialTests(unittest.TestCase):
     def test_keyboard_interrupt_preserves_target(self) -> None:
         target = self.root / "target.txt"
         target.write_text("old", encoding="utf-8")
-        with self.assertRaises(KeyboardInterrupt):
-            with atomic_open(target, "w") as staged:
-                staged.write("new")
-                raise KeyboardInterrupt
+        with self.assertRaises(KeyboardInterrupt), atomic_open(target, "w") as staged:
+            staged.write("new")
+            raise KeyboardInterrupt
         self.assertEqual(target.read_text(encoding="utf-8"), "old")
         self.assertEqual(self.staging_files(), [])
 
@@ -229,6 +237,8 @@ class AdversarialTests(unittest.TestCase):
     def test_undecodable_bytes_filename_is_supported_on_posix(self) -> None:
         if os.name != "posix":
             self.skipTest("POSIX byte-path semantics required")
+        if sys.platform == "darwin":
+            self.skipTest("macOS filesystems reject undecodable byte filenames")
         root = os.fsencode(self.root)
         target = root + b"/invalid-\xff-name"
         replace_bytes(target, b"content")
@@ -240,9 +250,8 @@ class AdversarialTests(unittest.TestCase):
 
     def test_invalid_text_buffering_cleans_created_staging_file(self) -> None:
         target = self.root / "target.txt"
-        with self.assertRaises(ValueError):
-            with atomic_open(target, "w", buffering=0):
-                pass
+        with self.assertRaises(ValueError), atomic_open(target, "w", buffering=0):
+            pass
         self.assertFalse(target.exists())
         self.assertEqual(self.staging_files(), [])
 

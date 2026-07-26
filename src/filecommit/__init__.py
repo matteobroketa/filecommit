@@ -5,8 +5,8 @@ from ._errors import (
     CleanupWarning,
     DirectorySyncError,
     FileCommitError,
-    UnsupportedDurabilityError,
     UnsafeTargetError,
+    UnsupportedDurabilityError,
 )
 
 __all__ = [
@@ -14,8 +14,8 @@ __all__ = [
     "DirectorySyncError",
     "Durability",
     "FileCommitError",
-    "UnsupportedDurabilityError",
     "UnsafeTargetError",
+    "UnsupportedDurabilityError",
     "atomic_open",
     "replace_bytes",
     "replace_text",

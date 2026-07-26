@@ -5,13 +5,12 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
-import sys
 import tempfile
 import venv
 from pathlib import Path
 from typing import Optional, Sequence
 
-_SMOKE = r'''
+_SMOKE = r"""
 import importlib.metadata
 import tempfile
 from pathlib import Path
@@ -34,7 +33,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert text.read_text(encoding="utf-8") == "second"
     assert binary.read_bytes() == b"\x00\x01\x02"
 print("isolated wheel smoke test passed")
-'''
+"""
 
 
 def _environment_python(directory: Path) -> Path:

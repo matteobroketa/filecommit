@@ -44,10 +44,7 @@ class DirectorySyncError(FileCommitError):
     def __init__(self, path: PathValue, cause: OSError) -> None:
         self.path = path
         self.cause = cause
-        message = (
-            "the target was replaced, but synchronizing its parent directory "
-            f"failed: {cause}"
-        )
+        message = f"the target was replaced, but synchronizing its parent directory failed: {cause}"
         super().__init__(cause.errno or errno.EIO, message, path)
 
 
@@ -58,6 +55,5 @@ class CleanupWarning(RuntimeWarning):
         self.temporary_path = temporary_path
         self.cause = cause
         super().__init__(
-            f"could not remove filecommit staging file {os.fsdecode(temporary_path)!r}: "
-            f"{cause}"
+            f"could not remove filecommit staging file {os.fsdecode(temporary_path)!r}: {cause}"
         )

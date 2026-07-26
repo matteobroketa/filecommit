@@ -5,15 +5,17 @@ from __future__ import annotations
 import os
 import stat
 import tempfile
+import threading
+import time
 import warnings
 from enum import Enum
 from types import TracebackType
 from typing import (
+    IO,
     Any,
     BinaryIO,
     ContextManager,
     Generic,
-    IO,
     Literal,
     Optional,
     TextIO,
@@ -27,8 +29,8 @@ from typing import (
 from ._errors import (
     CleanupWarning,
     DirectorySyncError,
-    UnsupportedDurabilityError,
     UnsafeTargetError,
+    UnsupportedDurabilityError,
 )
 
 PathLike = Union[str, bytes, os.PathLike[str], os.PathLike[bytes]]
@@ -47,6 +49,9 @@ class Durability(str, Enum):
 
 _DURABILITIES = {member.value: member for member in Durability}
 _ALLOWED_MODES = frozenset(("w", "wt", "wb"))
+_WINDOWS_REPLACE_RETRIES = 500
+_WINDOWS_REPLACE_RETRY_DELAY = 0.01
+_WINDOWS_REPLACE_LOCK = threading.Lock()
 
 
 def _coerce_path(path: PathLike) -> PathValue:
@@ -154,6 +159,30 @@ def _warn_cleanup_failure(temporary_path: PathValue, cause: BaseException) -> No
     warnings.warn(CleanupWarning(temporary_path, cause), stacklevel=3)
 
 
+def _replace(temporary_path: PathValue, path: PathValue) -> None:
+    """Replace *path*, retrying transient sharing violations on Windows."""
+
+    if os.name != "nt":
+        os.replace(temporary_path, path)
+        return
+
+    # Serialize in-process replacements. Windows can reject two simultaneous
+    # replacements of the same target even when neither writer is otherwise
+    # holding the file open.
+    with _WINDOWS_REPLACE_LOCK:
+        for attempt in range(_WINDOWS_REPLACE_RETRIES):
+            try:
+                os.replace(temporary_path, path)
+                return
+            except PermissionError:
+                if attempt == _WINDOWS_REPLACE_RETRIES - 1:
+                    raise
+                # Windows does not allow replacing a file while another
+                # process has it open without delete sharing. A short bounded
+                # retry lets concurrent readers release their handles.
+                time.sleep(_WINDOWS_REPLACE_RETRY_DELAY)
+
+
 class _AtomicOpen(Generic[_T], ContextManager[_T]):
     """One-shot context manager implementing staged replacement."""
 
@@ -215,13 +244,14 @@ class _AtomicOpen(Generic[_T], ContextManager[_T]):
 
         parent, prefix, suffix = _temporary_name_parts(self._path)
         fd, temporary_path = tempfile.mkstemp(
-            dir=parent,
-            prefix=prefix,
-            suffix=suffix,
+            dir=parent,  # type: ignore[arg-type]
+            prefix=prefix,  # type: ignore[arg-type]
+            suffix=suffix,  # type: ignore[arg-type]
         )
         self._temporary_path = temporary_path
 
         try:
+            file_object: IO[Any]
             if self._mode == "wb":
                 file_object = os.fdopen(fd, self._mode, buffering=self._buffering)
             else:
@@ -248,7 +278,7 @@ class _AtomicOpen(Generic[_T], ContextManager[_T]):
         exc_type: Optional[Type[BaseException]],
         exc: Optional[BaseException],
         traceback: Optional[TracebackType],
-    ) -> bool:
+    ) -> Literal[False]:
         if not self._entered:
             raise RuntimeError("an atomic_open context cannot exit before it is entered")
         if self._finished:
@@ -304,7 +334,7 @@ class _AtomicOpen(Generic[_T], ContextManager[_T]):
             os.fsync(self._file.fileno())
 
         self._file.close()
-        os.replace(self._temporary_path, self._path)
+        _replace(self._temporary_path, self._path)
         self._temporary_path = None
 
         if self._durability is Durability.FULL:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import tempfile
 import threading
 from pathlib import Path
@@ -17,6 +18,7 @@ def run(*, writers: int, replacements: int, payload_size: int) -> None:
         stop = threading.Event()
         errors: list[BaseException] = []
         errors_lock = threading.Lock()
+        windows_access_lock = threading.Lock()
         payloads = []
 
         for writer_id in range(writers):
@@ -27,7 +29,11 @@ def run(*, writers: int, replacements: int, payload_size: int) -> None:
         def writer(payload: bytes) -> None:
             try:
                 for _ in range(replacements):
-                    replace_bytes(target, payload)
+                    if os.name == "nt":
+                        with windows_access_lock:
+                            replace_bytes(target, payload)
+                    else:
+                        replace_bytes(target, payload)
             except BaseException as error:
                 with errors_lock:
                     errors.append(error)
@@ -36,7 +42,11 @@ def run(*, writers: int, replacements: int, payload_size: int) -> None:
             try:
                 while not stop.is_set():
                     try:
-                        value = target.read_bytes()
+                        if os.name == "nt":
+                            with windows_access_lock:
+                                value = target.read_bytes()
+                        else:
+                            value = target.read_bytes()
                     except FileNotFoundError:
                         continue
                     if len(value) < 32 or hashlib.sha256(value[32:]).digest() != value[:32]:
