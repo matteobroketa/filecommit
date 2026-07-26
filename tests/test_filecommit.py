@@ -20,7 +20,7 @@ from filecommit import (
     replace_bytes,
     replace_text,
 )
-from filecommit._core import _replace
+from filecommit._core import _WINDOWS_TARGET_LOCKS, _replace
 
 
 class FileCommitTests(unittest.TestCase):
@@ -393,16 +393,288 @@ class FileCommitTests(unittest.TestCase):
             nonlocal calls
             calls += 1
             if calls == 1:
-                raise PermissionError(errno.EACCES, "sharing violation")
+                error = PermissionError(errno.EACCES, "sharing violation")
+                error.winerror = 5
+                raise error
             real_replace(source, destination)
 
         with mock.patch("filecommit._core.os.name", "nt"):
             with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
-                with mock.patch("filecommit._core.time.sleep") as sleep:
-                    _replace(staging, target)
+                with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
+                    with mock.patch("filecommit._core.time.sleep") as sleep:
+                        _replace(staging, target)
         self.assertEqual(calls, 2)
-        sleep.assert_called_once_with(0.01)
+        sleep.assert_called_once_with(0.005)
         self.assertEqual(target.read_text(encoding="utf-8"), "new")
+
+    def test_replace_retries_only_explicit_transient_windows_errors(self) -> None:
+        target = self.root / "target.txt"
+        staging = self.root / "staging.txt"
+        real_replace = os.replace
+
+        for winerror in (5, 32, 33):
+            with self.subTest(winerror=winerror):
+                staging.write_text("new", encoding="utf-8")
+                calls = 0
+
+                def fail_once(
+                    source: object, destination: object, expected_winerror: int = winerror
+                ) -> None:
+                    nonlocal calls
+                    calls += 1
+                    if calls == 1:
+                        error = PermissionError(errno.EACCES, "transient replacement failure")
+                        error.winerror = expected_winerror
+                        raise error
+                    real_replace(source, destination)
+
+                with mock.patch("filecommit._core.os.name", "nt"):
+                    with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
+                        with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
+                            with mock.patch("filecommit._core.time.sleep") as sleep:
+                                _replace(staging, target)
+                self.assertEqual(calls, 2)
+                sleep.assert_called_once_with(0.005)
+                self.assertEqual(target.read_text(encoding="utf-8"), "new")
+
+    def test_replace_does_not_retry_nontransient_windows_errors(self) -> None:
+        target = self.root / "target.txt"
+        staging = self.root / "staging.txt"
+        staging.write_text("new", encoding="utf-8")
+        error = PermissionError(errno.EACCES, "permanent failure")
+        error.winerror = 87
+        with mock.patch("filecommit._core.os.name", "nt"):
+            with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
+                with mock.patch("filecommit._core.time.sleep") as sleep:
+                    with self.assertRaises(PermissionError) as raised:
+                        _replace(staging, target)
+        self.assertIs(raised.exception, error)
+        replace.assert_called_once_with(staging, target)
+        sleep.assert_not_called()
+
+    def test_replace_does_not_retry_permission_error_without_winerror(self) -> None:
+        target = self.root / "target.txt"
+        staging = self.root / "staging.txt"
+        staging.write_text("new", encoding="utf-8")
+        error = PermissionError(errno.EACCES, "unclassified failure")
+        with mock.patch("filecommit._core.os.name", "nt"):
+            with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
+                with mock.patch("filecommit._core.time.sleep") as sleep:
+                    with self.assertRaises(PermissionError) as raised:
+                        _replace(staging, target)
+        self.assertIs(raised.exception, error)
+        replace.assert_called_once_with(staging, target)
+        sleep.assert_not_called()
+
+    def test_replace_stops_at_monotonic_deadline(self) -> None:
+        target = self.root / "target.txt"
+        staging = self.root / "staging.txt"
+        staging.write_text("new", encoding="utf-8")
+        error = PermissionError(errno.EACCES, "sharing violation")
+        error.winerror = 5
+        with mock.patch("filecommit._core.os.name", "nt"):
+            with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
+                with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0, 5.0)):
+                    with mock.patch("filecommit._core.time.sleep") as sleep:
+                        with self.assertRaises(PermissionError) as raised:
+                            _replace(staging, target)
+        self.assertIs(raised.exception, error)
+        self.assertEqual(replace.call_count, 2)
+        sleep.assert_called_once_with(0.005)
+
+    def test_windows_same_target_writers_serialize_and_registry_is_reclaimed(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
+        target = self.root / "target.txt"
+        first_entered = threading.Event()
+        release_first = threading.Event()
+        second_entered = threading.Event()
+        errors: list[BaseException] = []
+
+        def first_writer() -> None:
+            try:
+                with atomic_open(target) as stream:
+                    first_entered.set()
+                    if not release_first.wait(5):
+                        raise TimeoutError("first writer was not released")
+                    stream.write("first")
+            except BaseException as error:
+                errors.append(error)
+
+        def second_writer() -> None:
+            try:
+                with atomic_open(target) as stream:
+                    second_entered.set()
+                    stream.write("second")
+            except BaseException as error:
+                errors.append(error)
+
+        first = threading.Thread(target=first_writer)
+        second = threading.Thread(target=second_writer)
+        first.start()
+        self.assertTrue(first_entered.wait(5))
+        second.start()
+        self.assertFalse(second_entered.wait(0.1))
+        release_first.set()
+        first.join(5)
+        second.join(5)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(target.read_text(encoding="utf-8"), "second")
+        self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
+
+    def test_windows_different_targets_can_progress_concurrently(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
+        first_target = self.root / "first.txt"
+        second_target = self.root / "second.txt"
+        first_entered = threading.Event()
+        release_first = threading.Event()
+        second_entered = threading.Event()
+        errors: list[BaseException] = []
+
+        def first_writer() -> None:
+            try:
+                with atomic_open(first_target) as stream:
+                    first_entered.set()
+                    if not release_first.wait(5):
+                        raise TimeoutError("first writer was not released")
+                    stream.write("first")
+            except BaseException as error:
+                errors.append(error)
+
+        def second_writer() -> None:
+            try:
+                with atomic_open(second_target) as stream:
+                    second_entered.set()
+                    stream.write("second")
+            except BaseException as error:
+                errors.append(error)
+
+        first = threading.Thread(target=first_writer)
+        second = threading.Thread(target=second_writer)
+        first.start()
+        self.assertTrue(first_entered.wait(5))
+        second.start()
+        self.assertTrue(second_entered.wait(5))
+        release_first.set()
+        first.join(5)
+        second.join(5)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
+
+    def test_windows_relative_and_absolute_aliases_share_a_lock(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
+        previous_directory = os.getcwd()
+        first_entered = threading.Event()
+        release_first = threading.Event()
+        second_entered = threading.Event()
+        errors: list[BaseException] = []
+        try:
+            os.chdir(self.root)
+            relative_operation = atomic_open("target.txt")
+            absolute_operation = atomic_open(self.root / "target.txt")
+        finally:
+            os.chdir(previous_directory)
+
+        def first_writer() -> None:
+            try:
+                with relative_operation as stream:
+                    first_entered.set()
+                    if not release_first.wait(5):
+                        raise TimeoutError("first writer was not released")
+                    stream.write("first")
+            except BaseException as error:
+                errors.append(error)
+
+        def second_writer() -> None:
+            try:
+                with absolute_operation as stream:
+                    second_entered.set()
+                    stream.write("second")
+            except BaseException as error:
+                errors.append(error)
+
+        first = threading.Thread(target=first_writer)
+        second = threading.Thread(target=second_writer)
+        first.start()
+        self.assertTrue(first_entered.wait(5))
+        second.start()
+        self.assertFalse(second_entered.wait(0.1))
+        release_first.set()
+        first.join(5)
+        second.join(5)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
+
+    def test_windows_case_variants_share_a_lock(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
+        target = self.root / "Target.TXT"
+        alias = self.root / "target.txt"
+        first_entered = threading.Event()
+        release_first = threading.Event()
+        second_entered = threading.Event()
+        errors: list[BaseException] = []
+
+        def first_writer() -> None:
+            try:
+                with atomic_open(target) as stream:
+                    first_entered.set()
+                    if not release_first.wait(5):
+                        raise TimeoutError("first writer was not released")
+                    stream.write("first")
+            except BaseException as error:
+                errors.append(error)
+
+        def second_writer() -> None:
+            try:
+                with atomic_open(alias) as stream:
+                    second_entered.set()
+                    stream.write("second")
+            except BaseException as error:
+                errors.append(error)
+
+        first = threading.Thread(target=first_writer)
+        second = threading.Thread(target=second_writer)
+        first.start()
+        self.assertTrue(first_entered.wait(5))
+        second.start()
+        self.assertFalse(second_entered.wait(0.1))
+        release_first.set()
+        first.join(5)
+        second.join(5)
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(target.read_text(encoding="utf-8"), "second")
+        self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
+
+    def test_windows_lock_is_released_after_body_exception(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
+        target = self.root / "target.txt"
+        with self.assertRaisesRegex(RuntimeError, "body"):
+            with atomic_open(target) as stream:
+                stream.write("new")
+                raise RuntimeError("body")
+        self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
+        replace_text(target, "replacement")
+        self.assertEqual(target.read_text(encoding="utf-8"), "replacement")
+        self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
+
+    def test_windows_lock_registry_does_not_grow_for_historical_targets(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
+        for index in range(64):
+            replace_text(self.root / f"target-{index}.txt", str(index))
+        self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
     def test_cleanup_failure_does_not_mask_body_exception(self) -> None:
         target = self.root / "target.txt"

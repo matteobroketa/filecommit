@@ -96,6 +96,9 @@ def _validate_metadata(errors: list[str]) -> None:
         errors.append("runtime dependencies must remain an explicit empty list")
     if 'requires = ["setuptools==82.0.1"]' not in text:
         errors.append("build backend dependency must remain pinned to setuptools==82.0.1")
+    # Build requirements cannot be queried reliably without downloading their
+    # metadata.  The required Python 3.9 package-build matrix below is the
+    # authoritative compatibility check for this exact offline pin.
     expected_tools = (
         '"build==1.5.0"',
         '"coverage==7.15.2"',

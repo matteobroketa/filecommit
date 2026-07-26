@@ -27,6 +27,7 @@ from tools.validate_dist import (
     compare_archives,
     write_checksums,
 )
+from tools.validate_repository import validate_repository
 
 
 class ProjectMetadataTests(unittest.TestCase):
@@ -56,6 +57,12 @@ class ProjectMetadataTests(unittest.TestCase):
     def test_release_gate_rejects_nonrelease_tag_before_other_checks(self) -> None:
         with self.assertRaises(ReleaseGateError):
             validate_release("latest")
+
+    def test_repository_policy_enforces_build_pin_through_python_39_matrix(self) -> None:
+        # The build requirement's Requires-Python metadata is not available
+        # offline.  validate_repository checks the exact pin and the CI/release
+        # Python 3.9 build matrices together.
+        validate_repository(allow_generated=True)
 
 
 class WorkflowPolicyTests(unittest.TestCase):

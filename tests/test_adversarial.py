@@ -83,6 +83,45 @@ class AdversarialTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertEqual(self.staging_files(), [])
 
+    def test_failure_cleanup_closes_stream_before_removing_staging_file(self) -> None:
+        target = self.root / "target.txt"
+        real_fdopen = os.fdopen
+        real_unlink = os.unlink
+        opened: list[object] = []
+
+        class TrackingFile:
+            def __init__(self, file_object: object) -> None:
+                self.file_object = file_object
+
+            @property
+            def closed(self) -> bool:
+                return self.file_object.closed  # type: ignore[union-attr]
+
+            def write(self, value: str) -> int:
+                return self.file_object.write(value)  # type: ignore[union-attr,no-any-return]
+
+            def close(self) -> None:
+                self.file_object.close()  # type: ignore[union-attr]
+
+        def tracked_fdopen(fd: int, *_args: object, **_kwargs: object) -> TrackingFile:
+            tracked = TrackingFile(real_fdopen(fd, "w", encoding="utf-8"))
+            opened.append(tracked)
+            return tracked
+
+        def assert_closed_then_unlink(path: object) -> None:
+            self.assertEqual(len(opened), 1)
+            self.assertTrue(opened[0].closed)  # type: ignore[union-attr]
+            real_unlink(path)
+
+        with mock.patch("filecommit._core.os.fdopen", side_effect=tracked_fdopen):
+            with mock.patch("filecommit._core.os.unlink", side_effect=assert_closed_then_unlink):
+                with self.assertRaisesRegex(RuntimeError, "body"):
+                    with atomic_open(target, "w") as staged:
+                        staged.write("new")
+                        raise RuntimeError("body")
+        self.assertFalse(target.exists())
+        self.assertEqual(self.staging_files(), [])
+
     def test_write_helpers_reject_nonprogressing_binary_writer(self) -> None:
         class FakeContext:
             def __init__(self, result: object) -> None:
@@ -237,16 +276,19 @@ class AdversarialTests(unittest.TestCase):
     def test_undecodable_bytes_filename_is_supported_on_posix(self) -> None:
         if os.name != "posix":
             self.skipTest("POSIX byte-path semantics required")
-        if sys.platform == "darwin":
-            self.skipTest("macOS filesystems reject undecodable byte filenames")
         root = os.fsencode(self.root)
         target = root + b"/invalid-\xff-name"
-        replace_bytes(target, b"content")
         try:
+            replace_bytes(target, b"content")
             with open(target, "rb") as file_object:
                 self.assertEqual(file_object.read(), b"content")
+        except OSError as error:
+            self.skipTest(f"filesystem rejects undecodable byte filenames: {error}")
         finally:
-            os.unlink(target)
+            try:
+                os.unlink(target)
+            except FileNotFoundError:
+                pass
 
     def test_invalid_text_buffering_cleans_created_staging_file(self) -> None:
         target = self.root / "target.txt"

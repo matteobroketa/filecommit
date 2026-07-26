@@ -49,9 +49,22 @@ class Durability(str, Enum):
 
 _DURABILITIES = {member.value: member for member in Durability}
 _ALLOWED_MODES = frozenset(("w", "wt", "wb"))
-_WINDOWS_REPLACE_RETRIES = 500
-_WINDOWS_REPLACE_RETRY_DELAY = 0.01
-_WINDOWS_REPLACE_LOCK = threading.Lock()
+_WINDOWS_TRANSIENT_REPLACE_ERRORS = frozenset((5, 32, 33))
+_WINDOWS_REPLACE_TIMEOUT = 5.0
+_WINDOWS_REPLACE_INITIAL_DELAY = 0.005
+_WINDOWS_REPLACE_MAX_DELAY = 0.05
+
+
+class _TargetLock:
+    """A registry entry retained while an owner or waiter can reference it."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.references = 0
+
+
+_WINDOWS_TARGET_LOCKS: dict[str, _TargetLock] = {}
+_WINDOWS_TARGET_LOCKS_GUARD = threading.Lock()
 
 
 def _coerce_path(path: PathLike) -> PathValue:
@@ -136,6 +149,39 @@ def _temporary_name_parts(path: PathValue) -> tuple[PathValue, PathValue, PathVa
     return parent, ".filecommit-", ".tmp"
 
 
+def _windows_target_lock_key(path: PathValue) -> str:
+    """Return a lexical Windows lock key without resolving parent symlinks."""
+
+    return os.path.normcase(os.fsdecode(path))
+
+
+def _acquire_windows_target_lock(path: PathValue) -> _TargetLock:
+    """Acquire a per-target lock and retain its registry entry while waiting."""
+
+    key = _windows_target_lock_key(path)
+    with _WINDOWS_TARGET_LOCKS_GUARD:
+        entry = _WINDOWS_TARGET_LOCKS.get(key)
+        if entry is None:
+            entry = _TargetLock()
+            _WINDOWS_TARGET_LOCKS[key] = entry
+        entry.references += 1
+    entry.lock.acquire()
+    return entry
+
+
+def _release_windows_target_lock(entry: _TargetLock) -> None:
+    """Release one owner reference and discard an entry with no waiters."""
+
+    entry.lock.release()
+    with _WINDOWS_TARGET_LOCKS_GUARD:
+        entry.references -= 1
+        if entry.references == 0:
+            for key, candidate in list(_WINDOWS_TARGET_LOCKS.items()):
+                if candidate is entry:
+                    del _WINDOWS_TARGET_LOCKS[key]
+                    break
+
+
 def _apply_permissions(fd: int, temporary_path: PathValue, permissions: int) -> None:
     if hasattr(os, "fchmod"):
         os.fchmod(fd, permissions)
@@ -166,21 +212,24 @@ def _replace(temporary_path: PathValue, path: PathValue) -> None:
         os.replace(temporary_path, path)
         return
 
-    # Serialize in-process replacements. Windows can reject two simultaneous
-    # replacements of the same target even when neither writer is otherwise
-    # holding the file open.
-    with _WINDOWS_REPLACE_LOCK:
-        for attempt in range(_WINDOWS_REPLACE_RETRIES):
-            try:
-                os.replace(temporary_path, path)
-                return
-            except PermissionError:
-                if attempt == _WINDOWS_REPLACE_RETRIES - 1:
-                    raise
-                # Windows does not allow replacing a file while another
-                # process has it open without delete sharing. A short bounded
-                # retry lets concurrent readers release their handles.
-                time.sleep(_WINDOWS_REPLACE_RETRY_DELAY)
+    deadline = time.monotonic() + _WINDOWS_REPLACE_TIMEOUT
+    delay = _WINDOWS_REPLACE_INITIAL_DELAY
+    while True:
+        try:
+            os.replace(temporary_path, path)
+            return
+        except OSError as error:
+            # ``os.replace`` reports a normal reader-held destination as
+            # WinError 5 on current CPython/Windows.  32 and 33 are the
+            # documented sharing and lock violations.  Do not retry generic
+            # PermissionError instances or unrelated access failures.
+            if getattr(error, "winerror", None) not in _WINDOWS_TRANSIENT_REPLACE_ERRORS:
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            time.sleep(min(delay, remaining))
+            delay = min(delay * 2, _WINDOWS_REPLACE_MAX_DELAY)
 
 
 class _AtomicOpen(Generic[_T], ContextManager[_T]):
@@ -231,6 +280,7 @@ class _AtomicOpen(Generic[_T], ContextManager[_T]):
 
         self._file: Optional[_T] = None
         self._temporary_path: Optional[PathValue] = None
+        self._target_lock: Optional[_TargetLock] = None
         self._entered = False
         self._finished = False
 
@@ -239,38 +289,45 @@ class _AtomicOpen(Generic[_T], ContextManager[_T]):
             raise RuntimeError("an atomic_open context manager can be entered only once")
         self._entered = True
 
-        _ensure_durability_supported(self._path, self._durability)
-        _validate_target(self._path, allow_hardlinks=self._allow_hardlinks)
-
-        parent, prefix, suffix = _temporary_name_parts(self._path)
-        fd, temporary_path = tempfile.mkstemp(
-            dir=parent,  # type: ignore[arg-type]
-            prefix=prefix,  # type: ignore[arg-type]
-            suffix=suffix,  # type: ignore[arg-type]
-        )
-        self._temporary_path = temporary_path
-
         try:
-            file_object: IO[Any]
-            if self._mode == "wb":
-                file_object = os.fdopen(fd, self._mode, buffering=self._buffering)
-            else:
-                file_object = os.fdopen(
-                    fd,
-                    self._mode,
-                    buffering=self._buffering,
-                    encoding=self._encoding,
-                    errors=self._errors,
-                    newline=self._newline,
-                )
-            self._file = cast(_T, file_object)
-            return self._file
-        except BaseException:
+            if os.name == "nt":
+                self._target_lock = _acquire_windows_target_lock(self._path)
+
+            _ensure_durability_supported(self._path, self._durability)
+            _validate_target(self._path, allow_hardlinks=self._allow_hardlinks)
+
+            parent, prefix, suffix = _temporary_name_parts(self._path)
+            fd, temporary_path = tempfile.mkstemp(
+                dir=parent,  # type: ignore[arg-type]
+                prefix=prefix,  # type: ignore[arg-type]
+                suffix=suffix,  # type: ignore[arg-type]
+            )
+            self._temporary_path = temporary_path
+
             try:
-                os.close(fd)
-            except OSError:
-                pass
-            self._cleanup_staging_file(warn=True)
+                file_object: IO[Any]
+                if self._mode == "wb":
+                    file_object = os.fdopen(fd, self._mode, buffering=self._buffering)
+                else:
+                    file_object = os.fdopen(
+                        fd,
+                        self._mode,
+                        buffering=self._buffering,
+                        encoding=self._encoding,
+                        errors=self._errors,
+                        newline=self._newline,
+                    )
+                self._file = cast(_T, file_object)
+                return self._file
+            except BaseException:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                self._cleanup_staging_file(warn=True)
+                raise
+        except BaseException:
+            self._release_target_lock()
             raise
 
     def __exit__(
@@ -285,21 +342,31 @@ class _AtomicOpen(Generic[_T], ContextManager[_T]):
             return False
         self._finished = True
 
-        if self._file is None or self._temporary_path is None:
-            return False
-
-        if exc_type is not None:
-            self._close_after_failure()
-            self._cleanup_staging_file(warn=True)
-            return False
-
         try:
-            self._commit()
-        except BaseException:
-            self._close_after_failure()
-            self._cleanup_staging_file(warn=True)
-            raise
-        return False
+            if self._file is None or self._temporary_path is None:
+                return False
+
+            if exc_type is not None:
+                self._close_after_failure()
+                self._cleanup_staging_file(warn=True)
+                return False
+
+            try:
+                self._commit()
+            except BaseException:
+                self._close_after_failure()
+                self._cleanup_staging_file(warn=True)
+                raise
+            return False
+        finally:
+            self._release_target_lock()
+
+    def _release_target_lock(self) -> None:
+        entry = self._target_lock
+        if entry is None:
+            return
+        self._target_lock = None
+        _release_windows_target_lock(entry)
 
     def _commit(self) -> None:
         assert self._file is not None
