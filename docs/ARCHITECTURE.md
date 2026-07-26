@@ -1,0 +1,73 @@
+# Architecture
+
+## Core transaction
+
+A successful operation follows one narrow transaction:
+
+1. Resolve the caller's path to an absolute lexical path.
+2. Validate that an existing target is a regular, non-symlink file and, by
+   default, has only one hard link.
+3. Create a secure random staging file in the same directory.
+4. Give the caller a standard Python text or binary stream.
+5. On an exception, close and remove the staging file.
+6. On success, flush Python buffers.
+7. Revalidate the target and determine final permission bits.
+8. Apply permission bits to the staging file.
+9. Optionally synchronize the staging file.
+10. Close the stream and call `os.replace(staging, target)`.
+11. For full durability, synchronize the parent directory.
+
+The only irreversible step is step 10. Failures before it leave the existing
+target unchanged. A failure in step 11 raises `DirectorySyncError`, explicitly
+reporting that the replacement is already committed.
+
+## Why same-directory staging
+
+Replacement must not cross filesystem boundaries. Creating the staging file in
+the target's directory also avoids relying on environment-controlled global
+temporary directories.
+
+## Why only write modes
+
+Append, read/write update, and exclusive creation have different concurrency
+contracts. Implementing them by reading the old file and writing a replacement
+would create lost-update behavior and potentially unbounded memory or disk use.
+The package therefore accepts only `w`, `wt`, and `wb`.
+
+## Why symlinks are refused
+
+`os.replace()` replaces a symlink directory entry rather than writing through
+it. That behavior is safe at the system-call level but often contradicts user
+intent. Refusal forces the caller to identify the intended regular-file path.
+
+## Why hard links are refused by default
+
+Replacing one hard-linked path creates a new filesystem object for that path;
+other links continue referencing the old object. The operation is valid but
+surprising, so it requires `allow_hardlinks=True`.
+
+## Why metadata copying is limited
+
+Portable Python can preserve basic mode bits. Ownership, ACLs, labels, extended
+attributes, alternate streams, and platform flags have platform-specific
+security and race implications. The package avoids pretending there is a safe,
+portable policy.
+
+## Why full durability is POSIX-only
+
+Python exposes `os.fsync()` for ordinary files on POSIX and Windows, but its
+standard library does not expose a portable Windows directory-handle flush.
+Silently degrading `full` would make the API dishonest, so the request is
+rejected before staging.
+
+## Non-goals
+
+- File locking
+- Compare-and-swap updates
+- Atomic no-overwrite creation
+- Directory-tree transactions
+- Metadata cloning
+- Serialization
+- Encryption
+- Remote or network storage abstractions
+- Automatic stale-file deletion

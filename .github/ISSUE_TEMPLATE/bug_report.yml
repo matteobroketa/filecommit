@@ -1,0 +1,54 @@
+name: Bug report
+description: Report incorrect atomicity, cleanup, permissions, or platform behavior
+title: ""
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Do not report exploitable vulnerabilities here. Use GitHub private
+        vulnerability reporting as described in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: filecommit version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: 3.13.5
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and filesystem
+      placeholder: Windows 11, NTFS
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and observed behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: attacker
+    attributes:
+      label: Was the target directory attacker-controlled?
+      options:
+        - "No"
+        - "Yes"
+        - "Unknown"
+    validations:
+      required: true
