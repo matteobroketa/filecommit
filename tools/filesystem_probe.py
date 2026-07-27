@@ -126,7 +126,9 @@ def run(directory: Path) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="atomicreplace-probe-", dir=directory) as temporary:
         root = Path(temporary)
         target = root / "target.bin"
-        descriptor, staging = tempfile.mkstemp(prefix=".atomicreplace-probe-", suffix=".tmp", dir=root)
+        descriptor, staging = tempfile.mkstemp(
+            prefix=".atomicreplace-probe-", suffix=".tmp", dir=root
+        )
         os.close(descriptor)
         Path(staging).unlink()
         _record(results, "same_directory_temporary", status="supported")

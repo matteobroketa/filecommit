@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence
 
-from atomicreplace import Durability, AtomicReplaceError, replace_bytes
+from atomicreplace import AtomicReplaceError, Durability, replace_bytes
 
 _PAYLOAD_SIZES = (0, 1024, 64 * 1024, 1024 * 1024, 16 * 1024 * 1024)
 

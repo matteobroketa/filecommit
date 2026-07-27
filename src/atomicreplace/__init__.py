@@ -2,18 +2,18 @@
 
 from ._core import Durability, atomic_open, replace_bytes, replace_text
 from ._errors import (
+    AtomicReplaceError,
     CleanupWarning,
     DirectorySyncError,
-    AtomicReplaceError,
     UnsafeTargetError,
     UnsupportedDurabilityError,
 )
 
 __all__ = [
+    "AtomicReplaceError",
     "CleanupWarning",
     "DirectorySyncError",
     "Durability",
-    "AtomicReplaceError",
     "UnsafeTargetError",
     "UnsupportedDurabilityError",
     "atomic_open",

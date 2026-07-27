@@ -190,7 +190,8 @@ class TransactionFaultMatrixTests(unittest.TestCase):
 
                         stack.enter_context(
                             mock.patch(
-                                "atomicreplace._core.os.open", side_effect=fail_parent_directory_open
+                                "atomicreplace._core.os.open",
+                                side_effect=fail_parent_directory_open,
                             )
                         )
                     elif boundary == "parent directory synchronization":
@@ -210,7 +211,9 @@ class TransactionFaultMatrixTests(unittest.TestCase):
                                 raise directory_error
 
                         stack.enter_context(
-                            mock.patch("atomicreplace._core.os.fsync", side_effect=fail_directory_sync)
+                            mock.patch(
+                                "atomicreplace._core.os.fsync", side_effect=fail_directory_sync
+                            )
                         )
                     else:
                         real_close = os.close

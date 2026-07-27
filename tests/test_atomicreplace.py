@@ -538,7 +538,9 @@ class AtomicReplaceTests(unittest.TestCase):
                     "atomicreplace._core._windows_replace_retries_enabled", return_value=True
                 ):
                     with mock.patch("atomicreplace._core.os.replace", side_effect=fail_once):
-                        with mock.patch("atomicreplace._core.time.monotonic", side_effect=(0.0, 0.0)):
+                        with mock.patch(
+                            "atomicreplace._core.time.monotonic", side_effect=(0.0, 0.0)
+                        ):
                             with mock.patch("atomicreplace._core.time.sleep") as sleep:
                                 _replace(staging, target)
                 self.assertEqual(calls, 2)
@@ -724,7 +726,7 @@ class AtomicReplaceTests(unittest.TestCase):
         try:
             os.chdir(self.root)
             relative_operation = atomic_open("target.txt")
-            absolute_operation = atomic_open(self.root / "target.txt")
+            absolute_operation = atomic_open(os.path.abspath("target.txt"))
         finally:
             os.chdir(previous_directory)
 
@@ -838,7 +840,9 @@ class AtomicReplaceTests(unittest.TestCase):
                         staged.write("new")
                         raise body_error
         self.assertIs(raised.exception, body_error)
-        self.assertTrue(any(isinstance(item.message, atomicreplace.CleanupWarning) for item in caught))
+        self.assertTrue(
+            any(isinstance(item.message, atomicreplace.CleanupWarning) for item in caught)
+        )
 
     def test_api_validation(self) -> None:
         target = self.root / "target.txt"

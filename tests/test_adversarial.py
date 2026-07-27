@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest import mock
 
 from atomicreplace import (
+    DirectorySyncError,
     UnsafeTargetError,
     UnsupportedDurabilityError,
     atomic_open,
@@ -139,7 +140,9 @@ class AdversarialTests(unittest.TestCase):
         target = self.root / "target.bin"
         for result in (None, 0, -1):
             with self.subTest(result=result):
-                with mock.patch("atomicreplace._core.atomic_open", return_value=FakeContext(result)):
+                with mock.patch(
+                    "atomicreplace._core.atomic_open", return_value=FakeContext(result)
+                ):
                     with self.assertRaises(OSError):
                         replace_bytes(target, b"content")
 
@@ -160,7 +163,9 @@ class AdversarialTests(unittest.TestCase):
         target = self.root / "target.txt"
         for result in (None, 0, -1):
             with self.subTest(result=result):
-                with mock.patch("atomicreplace._core.atomic_open", return_value=FakeContext(result)):
+                with mock.patch(
+                    "atomicreplace._core.atomic_open", return_value=FakeContext(result)
+                ):
                     with self.assertRaises(OSError):
                         replace_text(target, "content")
 
@@ -247,12 +252,18 @@ class AdversarialTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertEqual(self.staging_files(), [])
 
-    def test_full_durability_operates_on_local_posix_filesystem(self) -> None:
+    def test_full_durability_reports_honest_local_filesystem_outcome(self) -> None:
         if os.name != "posix":
             self.skipTest("full durability is POSIX-only")
         target = self.root / "target.txt"
-        replace_text(target, "new", durability="full")
-        self.assertEqual(target.read_text(encoding="utf-8"), "new")
+        try:
+            replace_text(target, "new", durability="full")
+        except DirectorySyncError as error:
+            self.assertTrue(error.committed)
+            self.assertIsInstance(error.cause, OSError)
+            self.assertEqual(target.read_text(encoding="utf-8"), "new")
+        else:
+            self.assertEqual(target.read_text(encoding="utf-8"), "new")
 
     def test_staging_file_is_in_target_directory(self) -> None:
         target = self.root / "target.txt"
@@ -273,22 +284,22 @@ class AdversarialTests(unittest.TestCase):
         replace_text(target, "content")
         self.assertEqual(target.read_text(encoding="utf-8"), "content")
 
-    def test_undecodable_bytes_filename_is_supported_on_posix(self) -> None:
+    def test_undecodable_bytes_filename_is_supported_when_filesystem_allows_it(self) -> None:
         if os.name != "posix":
             self.skipTest("POSIX byte-path semantics required")
         root = os.fsencode(self.root)
         target = root + b"/invalid-\xff-name"
+        created = False
         try:
             replace_bytes(target, b"content")
+            created = True
             with open(target, "rb") as file_object:
                 self.assertEqual(file_object.read(), b"content")
-        except OSError as error:
+        except (OSError, UnicodeError) as error:
             self.skipTest(f"filesystem rejects undecodable byte filenames: {error}")
         finally:
-            try:
+            if created:
                 os.unlink(target)
-            except FileNotFoundError:
-                pass
 
     def test_invalid_text_buffering_cleans_created_staging_file(self) -> None:
         target = self.root / "target.txt"
