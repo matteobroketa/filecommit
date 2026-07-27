@@ -476,7 +476,7 @@ class FileCommitTests(unittest.TestCase):
                 raise error
             real_replace(source, destination)
 
-        with mock.patch("filecommit._core.os.name", "nt"):
+        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
             with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
                 with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
                     with mock.patch("filecommit._core.time.sleep") as sleep:
@@ -484,6 +484,34 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(calls, 2)
         sleep.assert_called_once_with(0.005)
         self.assertEqual(target.read_text(encoding="utf-8"), "new")
+
+    def test_windows_retry_simulation_does_not_mutate_os_name(self) -> None:
+        target = self.root / "target.txt"
+        staging = self.root / "staging.txt"
+        staging.write_text("new", encoding="utf-8")
+        actual_os_name = os.name
+        real_replace = os.replace
+        calls = 0
+
+        def fail_once(source: object, destination: object) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                error = PermissionError(errno.EACCES, "sharing violation")
+                error.winerror = 5
+                raise error
+            real_replace(source, destination)
+
+        with mock.patch(
+            "filecommit._core._windows_replace_retries_enabled", return_value=True
+        ):
+            with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
+                with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
+                    with mock.patch("filecommit._core.time.sleep"):
+                        _replace(staging, target)
+
+        self.assertEqual(os.name, actual_os_name)
+        self.assertEqual(calls, 2)
 
     def test_replace_retries_only_explicit_transient_windows_errors(self) -> None:
         target = self.root / "target.txt"
@@ -506,7 +534,9 @@ class FileCommitTests(unittest.TestCase):
                         raise error
                     real_replace(source, destination)
 
-                with mock.patch("filecommit._core.os.name", "nt"):
+                with mock.patch(
+                    "filecommit._core._windows_replace_retries_enabled", return_value=True
+                ):
                     with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
                         with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
                             with mock.patch("filecommit._core.time.sleep") as sleep:
@@ -521,7 +551,7 @@ class FileCommitTests(unittest.TestCase):
         staging.write_text("new", encoding="utf-8")
         error = PermissionError(errno.EACCES, "permanent failure")
         error.winerror = 87
-        with mock.patch("filecommit._core.os.name", "nt"):
+        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
             with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
                 with mock.patch("filecommit._core.time.sleep") as sleep:
                     with self.assertRaises(PermissionError) as raised:
@@ -535,7 +565,7 @@ class FileCommitTests(unittest.TestCase):
         staging = self.root / "staging.txt"
         staging.write_text("new", encoding="utf-8")
         error = PermissionError(errno.EACCES, "unclassified failure")
-        with mock.patch("filecommit._core.os.name", "nt"):
+        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
             with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
                 with mock.patch("filecommit._core.time.sleep") as sleep:
                     with self.assertRaises(PermissionError) as raised:
@@ -550,7 +580,7 @@ class FileCommitTests(unittest.TestCase):
         staging.write_text("new", encoding="utf-8")
         error = PermissionError(errno.EACCES, "sharing violation")
         error.winerror = 5
-        with mock.patch("filecommit._core.os.name", "nt"):
+        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
             with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
                 with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0, 5.0)):
                     with mock.patch("filecommit._core.time.sleep") as sleep:

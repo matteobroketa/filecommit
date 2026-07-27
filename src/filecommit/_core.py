@@ -76,6 +76,12 @@ def _windows_target_locks_enabled() -> bool:
     return os.name == "nt"
 
 
+def _windows_replace_retries_enabled() -> bool:
+    """Return whether replacements need Windows sharing-violation retries."""
+
+    return os.name == "nt"
+
+
 def _coerce_path(path: PathLike) -> PathValue:
     value = os.fspath(path)
     if not value:
@@ -226,7 +232,7 @@ def _warn_cleanup_failure(temporary_path: PathValue, cause: BaseException) -> No
 def _replace(temporary_path: PathValue, path: PathValue) -> None:
     """Replace *path*, retrying transient sharing violations on Windows."""
 
-    if os.name != "nt":
+    if not _windows_replace_retries_enabled():
         os.replace(temporary_path, path)
         return
 
