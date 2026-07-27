@@ -502,9 +502,7 @@ class FileCommitTests(unittest.TestCase):
                 raise error
             real_replace(source, destination)
 
-        with mock.patch(
-            "filecommit._core._windows_replace_retries_enabled", return_value=True
-        ):
+        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
             with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
                 with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
                     with mock.patch("filecommit._core.time.sleep"):

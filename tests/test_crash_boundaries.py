@@ -54,7 +54,7 @@ class CrashBoundaryTests(unittest.TestCase):
         self.assertEqual(signal.read_text(encoding="utf-8"), point)
         return target
 
-    def test_pre_replacement_crashes_preserve_old_target_and_private_orphan(self) -> None:
+    def test_pre_replacement_crashes_preserve_old_target_and_orphan(self) -> None:
         points = (
             "after-staging",
             "after-partial-write",
@@ -70,7 +70,12 @@ class CrashBoundaryTests(unittest.TestCase):
                 staging = self.staging_files()
                 self.assertEqual(len(staging), 1)
                 if os.name == "posix":
-                    self.assertEqual(stat.S_IMODE(staging[0].stat().st_mode), 0o600)
+                    expected_mode = (
+                        stat.S_IMODE(target.stat().st_mode)
+                        if point in {"after-file-sync", "after-permissions", "before-replace"}
+                        else 0o600
+                    )
+                    self.assertEqual(stat.S_IMODE(staging[0].stat().st_mode), expected_mode)
                 staging[0].unlink()
 
     def test_post_replacement_crash_publishes_new_target(self) -> None:
