@@ -1,13 +1,10 @@
-include .editorconfig
-include .gitattributes
-include .gitignore
 include README.md
 include LICENSE
 include CHANGELOG.md
 include SECURITY.md
 include CONTRIBUTING.md
-include ROADMAP.md
-include VALIDATION.md
-recursive-include docs *.md
+include docs/ARCHITECTURE.md
+
 prune tests
 prune tools
+prune .github

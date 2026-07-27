@@ -30,9 +30,8 @@ _EXPECTED_SDIST_FILES = {
     "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
-    "ROADMAP.md",
     "SECURITY.md",
-    "VALIDATION.md",
+    "docs/ARCHITECTURE.md",
     "pyproject.toml",
     "src/atomicreplace/__init__.py",
     "src/atomicreplace/_core.py",
@@ -137,6 +136,16 @@ def validate_sdist(path: Path, *, version: str) -> None:
         missing = _EXPECTED_SDIST_FILES.difference(relative_names)
         if missing:
             raise DistributionValidationError(f"source archive is missing files: {sorted(missing)}")
+        process_documents = {
+            name
+            for name in relative_names
+            if name in {"ROADMAP.md", "VALIDATION.md"}
+            or (name.startswith("docs/") and name != "docs/ARCHITECTURE.md")
+        }
+        if process_documents:
+            raise DistributionValidationError(
+                f"source archive contains internal process documents: {sorted(process_documents)}"
+            )
 
 
 def _archive_payload(path: Path) -> Mapping[str, bytes]:
