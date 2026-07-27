@@ -70,6 +70,12 @@ _WINDOWS_TARGET_LOCKS: dict[str, _TargetLock] = {}
 _WINDOWS_TARGET_LOCKS_GUARD = threading.Lock()
 
 
+def _windows_target_locks_enabled() -> bool:
+    """Return whether this process needs the Windows target-lock registry."""
+
+    return os.name == "nt"
+
+
 def _coerce_path(path: PathLike) -> PathValue:
     value = os.fspath(path)
     if not value:
@@ -302,7 +308,7 @@ class _AtomicOpen(Generic[_T], ContextManager[_T]):
         self._entered = True
 
         try:
-            if os.name == "nt":
+            if _windows_target_locks_enabled():
                 self._target_lock = _acquire_windows_target_lock(self._path)
 
             _ensure_durability_supported(self._path, self._durability)

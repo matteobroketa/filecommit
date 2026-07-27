@@ -604,7 +604,7 @@ class FileCommitTests(unittest.TestCase):
 
     def test_windows_nested_same_target_write_is_reentrant_and_outer_commit_wins(self) -> None:
         target = self.root / "target.txt"
-        with mock.patch("filecommit._core.os.name", "nt"):
+        with mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True):
             with atomic_open(target) as outer:
                 replace_text(target, "inner")
                 outer.write("outer")
@@ -625,7 +625,7 @@ class FileCommitTests(unittest.TestCase):
                 self.references = 0
 
         entry = Entry()
-        with mock.patch("filecommit._core.os.name", "nt"):
+        with mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True):
             with mock.patch("filecommit._core._TargetLock", return_value=entry):
                 with self.assertRaisesRegex(KeyboardInterrupt, "interrupted"):
                     atomic_open(self.root / "target.txt").__enter__()
