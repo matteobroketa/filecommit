@@ -59,7 +59,10 @@ class _TargetLock:
     """A registry entry retained while an owner or waiter can reference it."""
 
     def __init__(self) -> None:
-        self.lock = threading.Lock()
+        # Context bodies may deliberately nest a replacement of the same
+        # target.  The outer context must remain protected while its owner can
+        # reacquire the per-target lock without self-deadlocking.
+        self.lock = threading.RLock()
         self.references = 0
 
 
@@ -165,7 +168,16 @@ def _acquire_windows_target_lock(path: PathValue) -> _TargetLock:
             entry = _TargetLock()
             _WINDOWS_TARGET_LOCKS[key] = entry
         entry.references += 1
-    entry.lock.acquire()
+    try:
+        entry.lock.acquire()
+    except BaseException:
+        # An interrupted blocking acquisition has not been attached to an
+        # _AtomicOpen instance, so its entry reference must be retired here.
+        with _WINDOWS_TARGET_LOCKS_GUARD:
+            entry.references -= 1
+            if entry.references == 0 and _WINDOWS_TARGET_LOCKS.get(key) is entry:
+                del _WINDOWS_TARGET_LOCKS[key]
+        raise
     return entry
 
 

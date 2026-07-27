@@ -86,3 +86,10 @@ python tools/ci.py stress
 
 The package remains dependency-free at runtime. Build, lint, type-check, and
 coverage tools are exact development-only dependencies.
+# Python-version typing boundary
+
+The pinned `mypy==2.3.0` supports analysis targets starting at Python 3.10, so
+its configured target is 3.10. Python 3.9 remains a supported runtime version:
+the required hosted matrix builds and tests it, and repository validation parses
+all Python source with Python 3.9 grammar. This is a tool limitation, not a
+change to the package support policy.

@@ -64,6 +64,15 @@ contracts. Implementing them by reading the old file and writing a replacement
 would create lost-update behavior and potentially unbounded memory or disk use.
 The package therefore accepts only `w`, `wt`, and `wb`.
 
+## Windows same-process serialization
+
+Windows uses a private, reference-counted per-target `RLock` from initial
+inspection through context exit. It serializes same-process writes to the same
+lexical, case-normalized target to reduce sharing-violation replacement
+failures. The lock is reentrant: a nested same-thread operation may commit, and
+the later successful outer replacement wins. It is not a public locking API,
+does not coordinate other processes, and does not prevent logical lost updates.
+
 ## Why symlinks are refused
 
 `os.replace()` replaces a symlink directory entry rather than writing through

@@ -79,8 +79,12 @@ provide weaker behavior than the host operating-system API suggests.
 - Directories, devices, FIFOs, sockets, and other non-regular targets are refused.
 - Special permission bits, ownership, ACLs, extended attributes, timestamps,
   alternate data streams, and platform-specific metadata are not copied.
-- Concurrent writers are last-successful-replacement-wins. This package does not
-  provide locking or compare-and-swap semantics.
+- Concurrent writers are last-successful-replacement-wins. On Windows,
+  same-process writes to the same lexical target are internally serialized for
+  the lifetime of each context to reduce replacement sharing failures; nested
+  use by the same thread is supported and the outer successful replacement wins.
+  This implementation safety mechanism neither coordinates other processes nor
+  provides locking or compare-and-swap semantics for logical updates.
 - A process terminated before replacement can leave a `.filecommit-*.tmp`
   staging file in the target directory. Existing target data remains untouched.
 
