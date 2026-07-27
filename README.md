@@ -1,7 +1,8 @@
 # atomicreplace
 
-`atomicreplace` performs explicit, same-directory, atomic file replacement using
-only the Python standard library.
+`atomicreplace` safely replaces files without exposing readers to partial content. It uses private same-directory staging, explicit durability controls, permission preservation, and strict target validation.
+
+Unlike basic atomic-write wrappers, atomicreplace refuses unsafe target types, handles permissions explicitly, distinguishes committed post-replacement errors, and validates behavior across Linux, macOS, and Windows.
 
 ```python
 from atomicreplace import replace_text
