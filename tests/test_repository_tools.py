@@ -18,7 +18,7 @@ from tools._project import (
 )
 from tools.check_workflows import external_action_reference, validate_workflow
 from tools.configure_repository import configure
-from tools.consumer_validation import _CONSUMER
+from tools.consumer_validation import _CONSUMER, _validate_public_exports
 from tools.install_smoke import resolve_wheel
 from tools.rebuild_from_sdist import _extract_safely, resolve_distributions
 from tools.release_gate import ReleaseGateError, validate_release
@@ -124,6 +124,17 @@ class DistributionToolTests(unittest.TestCase):
     def test_consumer_script_checks_import_side_effects_and_typed_marker(self) -> None:
         self.assertIn("import created files", _CONSUMER)
         self.assertIn("atomicreplace/py.typed", _CONSUMER)
+
+    def test_public_export_snapshot_ignores_export_order(self) -> None:
+        _validate_public_exports(("c", "a", "b"), ("a", "b", "c"))
+
+    def test_public_export_snapshot_rejects_missing_or_added_names(self) -> None:
+        with self.assertRaisesRegex(AssertionError, r"missing=\['b'\].*added=\['d'\]"):
+            _validate_public_exports(("a", "c", "d"), ("a", "b", "c"))
+
+    def test_public_export_snapshot_rejects_duplicate_names(self) -> None:
+        with self.assertRaisesRegex(AssertionError, "duplicate exports"):
+            _validate_public_exports(("a", "b", "b"), ("a", "b", "c"))
 
     def test_checksum_output_is_sorted_and_correct(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

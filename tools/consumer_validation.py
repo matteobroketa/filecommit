@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import os
 import subprocess
 import tempfile
@@ -15,7 +16,26 @@ try:
 except ModuleNotFoundError:  # Running as ``python tools/consumer_validation.py``.
     from install_smoke import resolve_wheel
 
-_CONSUMER = r"""
+
+def _validate_public_exports(
+    actual_exports: Sequence[str], expected_exports: Sequence[str]
+) -> None:
+    actual = tuple(actual_exports)
+    expected = tuple(expected_exports)
+    if len(actual) != len(set(actual)):
+        raise AssertionError("__all__ contains duplicate exports")
+    if set(actual) != set(expected):
+        raise AssertionError(
+            "public exports changed: "
+            f"missing={sorted(set(expected) - set(actual))}, "
+            f"added={sorted(set(actual) - set(expected))}"
+        )
+
+
+_CONSUMER = (
+    r"""
+from __future__ import annotations
+
 import importlib.metadata
 import inspect
 import json
@@ -31,7 +51,10 @@ assert before == after, "import created files in the consumer directory"
 
 snapshot = json.loads(Path(os.environ["ATOMICREPLACE_SNAPSHOT"]).read_text(encoding="utf-8"))
 assert atomicreplace.__version__ == snapshot["version"]
-assert atomicreplace.__all__ == snapshot["exports"]
+"""
+    + inspect.getsource(_validate_public_exports)
+    + r"""
+_validate_public_exports(atomicreplace.__all__, snapshot["exports"])
 for name, signature in snapshot["signatures"].items():
     assert str(inspect.signature(getattr(atomicreplace, name))) == signature
 
@@ -72,6 +95,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert artifact.read_bytes() == b"\x00\x01consumer"
 print("wheel consumer validation passed")
 """
+)
 
 
 def _environment_python(directory: Path) -> Path:

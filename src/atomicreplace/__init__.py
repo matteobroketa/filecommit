@@ -1,4 +1,5 @@
 """Explicit, dependency-free atomic file replacement."""
+# ruff: noqa: RUF022
 
 from ._core import Durability, atomic_open, replace_bytes, replace_text
 from ._errors import (
@@ -10,10 +11,10 @@ from ._errors import (
 )
 
 __all__ = [
-    "AtomicReplaceError",
     "CleanupWarning",
     "DirectorySyncError",
     "Durability",
+    "AtomicReplaceError",
     "UnsafeTargetError",
     "UnsupportedDurabilityError",
     "atomic_open",
