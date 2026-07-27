@@ -20,6 +20,31 @@ env:
   PYTHONUNBUFFERED: "1"
 
 jobs:
+  model-validation:
+    name: Extended model validation (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Install package
+        run: python -m pip install .
+      - name: Run extended deterministic model validation
+        run: >-
+          python tools/model_validation.py --cases 500
+          --seed 0 --seed 1 --seed 2 --seed 3 --seed 4 --seed 5 --seed 6 --seed 7
+          --seed 8 --seed 9 --seed 10 --seed 11 --seed 12 --seed 13 --seed 14 --seed 15
+
   repeated-tests:
     name: Repeated tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -68,6 +93,73 @@ jobs:
           --writers 16
           --replacements 200
           --payload-size 131072
+
+  filesystem-probe:
+    name: Filesystem capability probe (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Install package
+        run: python -m pip install .
+      - name: Probe runner filesystem
+        run: python tools/filesystem_probe.py . > filesystem-probe.json
+      - name: Probe Linux tmpfs when available
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          if test -d /dev/shm && test -w /dev/shm; then
+            probe_root="$(mktemp -d /dev/shm/filecommit-probe.XXXXXX)"
+            trap 'rmdir "$probe_root"' EXIT
+            python tools/filesystem_probe.py "$probe_root" > filesystem-probe-tmpfs.json
+          else
+            printf '%s\n' '{"status":"unsupported","reason":"/dev/shm unavailable"}' > filesystem-probe-tmpfs.json
+          fi
+      - name: Upload filesystem probe evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: filesystem-probe-${{ matrix.os }}
+          path: filesystem-probe*.json
+          if-no-files-found: error
+
+  benchmark:
+    name: Performance evidence (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.14"
+      - name: Install package and build frontend
+        run: python -m pip install . build==1.5.0
+      - name: Record non-blocking performance evidence
+        run: python tools/benchmark_filecommit.py --json-output benchmark.json
+      - name: Upload benchmark evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-${{ matrix.os }}
+          path: benchmark.json
+          if-no-files-found: error
 
   reproducibility:
     name: Reproducible package content

@@ -16,8 +16,9 @@ try:
 except ModuleNotFoundError:  # Running as ``python tools/validate_dist.py``.
     from _project import ROOT, project_version, write_text
 
-_FORBIDDEN_PARTS = {"__pycache__", ".git", ".github"}
+_FORBIDDEN_PARTS = {"__pycache__", ".git", ".github", "tests", "tools"}
 _FORBIDDEN_SUFFIXES = {".pyc", ".pyo"}
+_FORBIDDEN_NAMES = {".coverage", ".env", ".envrc", "id_rsa", "id_ed25519"}
 _EXPECTED_WHEEL_FILES = {
     "filecommit/__init__.py",
     "filecommit/_core.py",
@@ -47,7 +48,8 @@ class DistributionValidationError(RuntimeError):
 def _forbidden(name: str) -> bool:
     path = Path(name)
     forbidden_part = any(part in _FORBIDDEN_PARTS for part in path.parts)
-    return forbidden_part or path.suffix in _FORBIDDEN_SUFFIXES
+    secret_name = path.name.lower() in _FORBIDDEN_NAMES or "secret" in path.name.lower()
+    return forbidden_part or secret_name or path.suffix in _FORBIDDEN_SUFFIXES
 
 
 def _wheel_metadata(archive: zipfile.ZipFile) -> tuple[str, str]:

@@ -6,7 +6,8 @@ only the Python standard library.
 ```python
 from filecommit import replace_text
 
-replace_text("settings.toml", rendered_settings, durability="full")
+rendered_settings = "enabled = true\n"
+replace_text("settings.toml", rendered_settings, durability="data")
 ```
 
 Or write incrementally:
@@ -14,6 +15,7 @@ Or write incrementally:
 ```python
 from filecommit import atomic_open
 
+rendered_manifest = '{"files": []}\n'
 with atomic_open("manifest.json", "w", permissions=0o600) as file:
     file.write(rendered_manifest)
 ```

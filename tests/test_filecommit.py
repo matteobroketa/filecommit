@@ -382,6 +382,84 @@ class FileCommitTests(unittest.TestCase):
         self.assertIn(target.read_bytes(), payloads)
         self.assertEqual(self.staging_files(), [])
 
+    def test_threaded_readers_observe_only_complete_payloads(self) -> None:
+        target = self.root / "target.bin"
+        payloads = [bytes([index]) * 32_000 for index in range(1, 4)]
+        target.write_bytes(payloads[0])
+        start = threading.Barrier(len(payloads))
+        stop = threading.Event()
+        reader_started = threading.Event()
+        errors: list[BaseException] = []
+
+        def reader() -> None:
+            try:
+                reader_started.set()
+                while not stop.is_set():
+                    try:
+                        observed = target.read_bytes()
+                    except (FileNotFoundError, PermissionError):
+                        continue
+                    if observed not in payloads:
+                        raise AssertionError("reader observed partial or mixed payload")
+            except BaseException as error:
+                errors.append(error)
+
+        def writer(payload: bytes) -> None:
+            try:
+                start.wait()
+                for _ in range(10):
+                    replace_bytes(target, payload)
+            except BaseException as error:
+                errors.append(error)
+
+        reader_thread = threading.Thread(target=reader, name="filecommit-reader")
+        writer_threads = [threading.Thread(target=writer, args=(payload,)) for payload in payloads]
+        reader_thread.start()
+        self.assertTrue(reader_started.wait(5))
+        for thread in writer_threads:
+            thread.start()
+        for thread in writer_threads:
+            thread.join(5)
+        stop.set()
+        reader_thread.join(5)
+        self.assertTrue(all(not thread.is_alive() for thread in writer_threads))
+        self.assertFalse(reader_thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertIn(target.read_bytes(), payloads)
+
+    def test_native_windows_reader_handle_releases_retrying_replacement(self) -> None:
+        if os.name != "nt":
+            self.skipTest("native Windows sharing semantics required")
+        target = self.root / "target.txt"
+        target.write_text("old", encoding="utf-8")
+        replacement_was_blocked = threading.Event()
+        errors: list[BaseException] = []
+        real_replace = os.replace
+
+        def record_real_replacement(source: object, destination: object) -> None:
+            try:
+                real_replace(source, destination)
+            except PermissionError:
+                replacement_was_blocked.set()
+                raise
+
+        def writer() -> None:
+            try:
+                replace_text(target, "new")
+            except BaseException as error:
+                errors.append(error)
+
+        with target.open("rb") as reader:
+            with mock.patch("filecommit._core.os.replace", side_effect=record_real_replacement):
+                writer_thread = threading.Thread(target=writer, name="filecommit-writer")
+                writer_thread.start()
+                self.assertTrue(replacement_was_blocked.wait(5))
+                reader.close()
+                writer_thread.join(5)
+        self.assertFalse(writer_thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(target.read_text(encoding="utf-8"), "new")
+
     def test_replace_retries_transient_windows_sharing_violation(self) -> None:
         target = self.root / "target.txt"
         staging = self.root / "staging.txt"

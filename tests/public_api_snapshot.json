@@ -1,0 +1,19 @@
+{
+  "exports": [
+    "CleanupWarning",
+    "DirectorySyncError",
+    "Durability",
+    "FileCommitError",
+    "UnsafeTargetError",
+    "UnsupportedDurabilityError",
+    "atomic_open",
+    "replace_bytes",
+    "replace_text"
+  ],
+  "signatures": {
+    "atomic_open": "(path: 'PathLike', mode: 'WriteMode' = 'w', *, buffering: 'int' = -1, encoding: 'Optional[str]' = None, errors: 'Optional[str]' = None, newline: 'Optional[str]' = None, permissions: 'Optional[int]' = None, preserve_permissions: 'bool' = True, durability: 'Union[Durability, str]' = <Durability.NONE: 'none'>, allow_hardlinks: 'bool' = False) -> 'ContextManager[IO[Any]]'",
+    "replace_bytes": "(path: 'PathLike', data: 'Union[bytes, bytearray, memoryview]', *, permissions: 'Optional[int]' = None, preserve_permissions: 'bool' = True, durability: 'Union[Durability, str]' = <Durability.NONE: 'none'>, allow_hardlinks: 'bool' = False) -> 'None'",
+    "replace_text": "(path: 'PathLike', text: 'str', *, encoding: 'str' = 'utf-8', errors: 'str' = 'strict', newline: 'Optional[str]' = None, permissions: 'Optional[int]' = None, preserve_permissions: 'bool' = True, durability: 'Union[Durability, str]' = <Durability.NONE: 'none'>, allow_hardlinks: 'bool' = False) -> 'None'"
+  },
+  "version": "0.1.0"
+}

@@ -171,8 +171,27 @@ class TransactionFaultMatrixTests(unittest.TestCase):
 
                 with ExitStack() as stack:
                     if boundary == "parent directory open":
+                        real_open = os.open
+                        expected_parent = os.path.dirname(os.path.abspath(target))
+                        directory_flag = getattr(os, "O_DIRECTORY", 0)
+
+                        def fail_parent_directory_open(
+                            path: object,
+                            flags: int,
+                            *arguments: object,
+                            parent: str = expected_parent,
+                            required_flag: int = directory_flag,
+                            original_open: object = real_open,
+                            directory_error: OSError = error,
+                        ) -> int:
+                            if path == parent and (required_flag == 0 or flags & required_flag):
+                                raise directory_error
+                            return original_open(path, flags, *arguments)  # type: ignore[operator]
+
                         stack.enter_context(
-                            mock.patch("filecommit._core.os.open", side_effect=error)
+                            mock.patch(
+                                "filecommit._core.os.open", side_effect=fail_parent_directory_open
+                            )
                         )
                     elif boundary == "parent directory synchronization":
                         real_fsync = os.fsync

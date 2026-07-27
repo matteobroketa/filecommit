@@ -49,6 +49,7 @@ def command(name: str) -> None:
         _run("-m", "ruff", "format", "--check", ".")
         _run("-m", "ruff", "check", ".")
         _run("-m", "mypy")
+        _run("tools/typecheck_consumers.py")
     elif name == "package":
         _clean()
         _run("-m", "build")
@@ -58,6 +59,7 @@ def command(name: str) -> None:
         if len(wheels) != 1 or len(sdists) != 1:
             raise CommandError("build did not produce one wheel and one source archive")
         _run("tools/install_smoke.py", str(wheels[0]))
+        _run("tools/consumer_validation.py", str(wheels[0]))
         _run("tools/rebuild_from_sdist.py", str(sdists[0]), str(wheels[0]))
     elif name == "stress":
         _run("tools/stress_atomicity.py")

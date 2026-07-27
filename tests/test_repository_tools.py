@@ -18,6 +18,7 @@ from tools._project import (
 )
 from tools.check_workflows import external_action_reference, validate_workflow
 from tools.configure_repository import configure
+from tools.consumer_validation import _CONSUMER
 from tools.install_smoke import resolve_wheel
 from tools.rebuild_from_sdist import _extract_safely, resolve_distributions
 from tools.release_gate import ReleaseGateError, validate_release
@@ -116,7 +117,13 @@ class DistributionToolTests(unittest.TestCase):
     def test_forbidden_archive_entries(self) -> None:
         self.assertTrue(_forbidden("package/__pycache__/module.pyc"))
         self.assertTrue(_forbidden("package/.github/workflows/release.yml"))
+        self.assertTrue(_forbidden("package/tests/test_api.py"))
+        self.assertTrue(_forbidden("package/secret-token.txt"))
         self.assertFalse(_forbidden("package/src/filecommit/_core.py"))
+
+    def test_consumer_script_checks_import_side_effects_and_typed_marker(self) -> None:
+        self.assertIn("import created files", _CONSUMER)
+        self.assertIn("filecommit/py.typed", _CONSUMER)
 
     def test_checksum_output_is_sorted_and_correct(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

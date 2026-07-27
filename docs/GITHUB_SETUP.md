@@ -75,7 +75,9 @@ In **Settings → Security** or **Code security and analysis**, enable:
 - private vulnerability reporting.
 
 The committed security workflow performs CodeQL and dependency-review checks;
-the repository settings make their results visible and enforceable.
+the repository settings make their results visible and enforceable. Select
+CodeQL **advanced setup** (or disable CodeQL default setup) so GitHub does not
+submit a second, incompatible analysis alongside `.github/workflows/security.yml`.
 
 ## 6. Create the protected PyPI environment
 

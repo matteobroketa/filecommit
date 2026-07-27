@@ -117,6 +117,8 @@ def _validate_workflow_architecture(errors: list[str]) -> None:
             'python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]',
             "python -m coverage report --fail-under=95",
             "python tools/install_smoke.py dist",
+            "python tools/consumer_validation.py dist",
+            "python tools/typecheck_consumers.py",
             "python tools/rebuild_from_sdist.py dist",
             "python tools/stress_atomicity.py",
             "name: Required",
@@ -131,7 +133,12 @@ def _validate_workflow_architecture(errors: list[str]) -> None:
         ),
         "extended.yml": (
             "python tools/repeat_tests.py --runs 15",
+            "python tools/model_validation.py --cases 500",
             "python tools/stress_atomicity.py",
+            "python tools/filesystem_probe.py . > filesystem-probe.json",
+            "filesystem-probe*.json",
+            "python tools/benchmark_filecommit.py --json-output benchmark.json",
+            "benchmark.json",
             "--compare-directory dist-second",
         ),
         "release.yml": (
