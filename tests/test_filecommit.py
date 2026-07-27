@@ -603,15 +603,19 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
     def test_windows_nested_same_target_write_is_reentrant_and_outer_commit_wins(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
         target = self.root / "target.txt"
-        with mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True):
-            with atomic_open(target) as outer:
-                replace_text(target, "inner")
-                outer.write("outer")
+        with atomic_open(target) as outer:
+            replace_text(target, "inner")
+            outer.write("outer")
         self.assertEqual(target.read_text(encoding="utf-8"), "outer")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
     def test_windows_interrupted_lock_acquisition_reclaims_registry_reference(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Windows target locking required")
+
         class InterruptedLock:
             def acquire(self) -> None:
                 raise KeyboardInterrupt("interrupted")
@@ -625,10 +629,9 @@ class FileCommitTests(unittest.TestCase):
                 self.references = 0
 
         entry = Entry()
-        with mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True):
-            with mock.patch("filecommit._core._TargetLock", return_value=entry):
-                with self.assertRaisesRegex(KeyboardInterrupt, "interrupted"):
-                    atomic_open(self.root / "target.txt").__enter__()
+        with mock.patch("filecommit._core._TargetLock", return_value=entry):
+            with self.assertRaisesRegex(KeyboardInterrupt, "interrupted"):
+                atomic_open(self.root / "target.txt").__enter__()
         self.assertEqual(entry.references, 0)
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
