@@ -20,13 +20,15 @@ from filecommit import (
     replace_bytes,
     replace_text,
 )
-from filecommit._core import _WINDOWS_TARGET_LOCKS, _replace
+from filecommit._core import _WINDOWS_TARGET_LOCKS, _replace, _windows_target_lock_key
 
 
 class FileCommitTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
+        _WINDOWS_TARGET_LOCKS.clear()
+        self.addCleanup(_WINDOWS_TARGET_LOCKS.clear)
 
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
@@ -588,9 +590,10 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(replace.call_count, 2)
         sleep.assert_called_once_with(0.005)
 
-    def test_windows_same_target_writers_serialize_and_registry_is_reclaimed(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_same_target_writers_serialize_and_registry_is_reclaimed(
+        self, _locks: object
+    ) -> None:
         target = self.root / "target.txt"
         first_entered = threading.Event()
         release_first = threading.Event()
@@ -630,9 +633,16 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "second")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    def test_windows_nested_same_target_write_is_reentrant_and_outer_commit_wins(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @unittest.skipUnless(os.name == "nt", "native Windows path behavior required")
+    def test_native_windows_target_lock_key_normalizes_case(self) -> None:
+        target = self.root / "Target.TXT"
+        alias = self.root / "target.txt"
+        self.assertEqual(_windows_target_lock_key(target), _windows_target_lock_key(alias))
+
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_nested_same_target_write_is_reentrant_and_outer_commit_wins(
+        self, _locks: object
+    ) -> None:
         target = self.root / "target.txt"
         with atomic_open(target) as outer:
             replace_text(target, "inner")
@@ -640,9 +650,10 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "outer")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    def test_windows_interrupted_lock_acquisition_reclaims_registry_reference(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_interrupted_lock_acquisition_reclaims_registry_reference(
+        self, _locks: object
+    ) -> None:
 
         class InterruptedLock:
             def acquire(self) -> None:
@@ -663,9 +674,8 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(entry.references, 0)
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    def test_windows_different_targets_can_progress_concurrently(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_different_targets_can_progress_concurrently(self, _locks: object) -> None:
         first_target = self.root / "first.txt"
         second_target = self.root / "second.txt"
         first_entered = threading.Event()
@@ -705,9 +715,8 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    def test_windows_relative_and_absolute_aliases_share_a_lock(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_relative_and_absolute_aliases_share_a_lock(self, _locks: object) -> None:
         previous_directory = os.getcwd()
         first_entered = threading.Event()
         release_first = threading.Event()
@@ -752,9 +761,12 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    def test_windows_case_variants_share_a_lock(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @mock.patch(
+        "filecommit._core._windows_target_lock_key",
+        side_effect=lambda path: os.fsdecode(path).casefold(),
+    )
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_case_variants_share_a_lock(self, _locks: object, _lock_key: object) -> None:
         target = self.root / "Target.TXT"
         alias = self.root / "target.txt"
         first_entered = threading.Event()
@@ -792,12 +804,11 @@ class FileCommitTests(unittest.TestCase):
         self.assertFalse(first.is_alive())
         self.assertFalse(second.is_alive())
         self.assertEqual(errors, [])
-        self.assertEqual(target.read_text(encoding="utf-8"), "second")
+        self.assertEqual(alias.read_text(encoding="utf-8"), "second")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    def test_windows_lock_is_released_after_body_exception(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_lock_is_released_after_body_exception(self, _locks: object) -> None:
         target = self.root / "target.txt"
         with self.assertRaisesRegex(RuntimeError, "body"):
             with atomic_open(target) as stream:
@@ -808,9 +819,10 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "replacement")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    def test_windows_lock_registry_does_not_grow_for_historical_targets(self) -> None:
-        if os.name != "nt":
-            self.skipTest("Windows target locking required")
+    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    def test_windows_lock_registry_does_not_grow_for_historical_targets(
+        self, _locks: object
+    ) -> None:
         for index in range(64):
             replace_text(self.root / f"target-{index}.txt", str(index))
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
