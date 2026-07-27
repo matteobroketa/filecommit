@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ntpath
 import os
 import stat
 import tempfile
@@ -167,7 +168,7 @@ def _temporary_name_parts(path: PathValue) -> tuple[PathValue, PathValue, PathVa
 def _windows_target_lock_key(path: PathValue) -> str:
     """Return a lexical Windows lock key without resolving parent symlinks."""
 
-    return os.path.normcase(os.fsdecode(path))
+    return ntpath.normcase(os.fsdecode(path))
 
 
 def _acquire_windows_target_lock(path: PathValue) -> _TargetLock:

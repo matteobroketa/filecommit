@@ -633,11 +633,10 @@ class AtomicReplaceTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "second")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    @unittest.skipUnless(os.name == "nt", "native Windows path behavior required")
-    def test_native_windows_target_lock_key_normalizes_case(self) -> None:
-        target = self.root / "Target.TXT"
-        alias = self.root / "target.txt"
-        self.assertEqual(_windows_target_lock_key(target), _windows_target_lock_key(alias))
+    def test_windows_target_lock_key_normalizes_case(self) -> None:
+        upper = self.root / "Target.TXT"
+        lower = self.root / "target.txt"
+        self.assertEqual(_windows_target_lock_key(upper), _windows_target_lock_key(lower))
 
     @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_nested_same_target_write_is_reentrant_and_outer_commit_wins(
@@ -763,12 +762,12 @@ class AtomicReplaceTests(unittest.TestCase):
 
     @mock.patch(
         "atomicreplace._core._windows_target_lock_key",
-        side_effect=lambda path: os.fsdecode(path).casefold(),
+        return_value="shared-test-key",
     )
     @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
-    def test_windows_case_variants_share_a_lock(self, _locks: object, _lock_key: object) -> None:
-        target = self.root / "Target.TXT"
-        alias = self.root / "target.txt"
+    def test_equal_lock_keys_serialize_writers(self, _locks: object, _lock_key: object) -> None:
+        first_target = self.root / "first.txt"
+        second_target = self.root / "second.txt"
         first_entered = threading.Event()
         release_first = threading.Event()
         second_entered = threading.Event()
@@ -776,7 +775,7 @@ class AtomicReplaceTests(unittest.TestCase):
 
         def first_writer() -> None:
             try:
-                with atomic_open(target) as stream:
+                with atomic_open(first_target) as stream:
                     first_entered.set()
                     if not release_first.wait(5):
                         raise TimeoutError("first writer was not released")
@@ -786,7 +785,7 @@ class AtomicReplaceTests(unittest.TestCase):
 
         def second_writer() -> None:
             try:
-                with atomic_open(alias) as stream:
+                with atomic_open(second_target) as stream:
                     second_entered.set()
                     stream.write("second")
             except BaseException as error:
@@ -804,7 +803,8 @@ class AtomicReplaceTests(unittest.TestCase):
         self.assertFalse(first.is_alive())
         self.assertFalse(second.is_alive())
         self.assertEqual(errors, [])
-        self.assertEqual(alias.read_text(encoding="utf-8"), "second")
+        self.assertEqual(first_target.read_text(encoding="utf-8"), "first")
+        self.assertEqual(second_target.read_text(encoding="utf-8"), "second")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
     @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
