@@ -21,7 +21,7 @@ Every push and pull request runs `.github/workflows/ci.yml`:
    contents and metadata, installs the wheel without an index or dependencies,
    and rebuilds an equivalent wheel from the source archive.
 6. A concurrent reader/writer stress test runs on all three operating systems.
-7. One stable `Required` job aggregates every result for branch protection.
+7. One stable `CI required` job aggregates every result for branch protection.
 
 The test matrix installs the package before running tests. It therefore tests
 what packaging exposes rather than importing `src/` through an environment
@@ -31,7 +31,7 @@ variable.
 
 `.github/workflows/security.yml` runs workflow-policy enforcement, dependency
 review for pull requests, and CodeQL analysis for both Python and GitHub Actions.
-The workflow has a separate stable `Required` aggregate check.
+The workflow has a separate stable `CI required` aggregate check.
 
 `.github/dependabot.yml` proposes reviewed updates for development tools and
 pinned GitHub Actions. Dependency updates never publish automatically.

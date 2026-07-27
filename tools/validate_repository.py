@@ -121,7 +121,7 @@ def _validate_workflow_architecture(errors: list[str]) -> None:
             "python tools/typecheck_consumers.py",
             "python tools/rebuild_from_sdist.py dist",
             "python tools/stress_atomicity.py",
-            "name: Required",
+            "name: CI required",
         ),
         "security.yml": (
             "language: [python, actions]",
@@ -129,7 +129,7 @@ def _validate_workflow_architecture(errors: list[str]) -> None:
             "actions/dependency-review-action@",
             "github/codeql-action/init@",
             "github/codeql-action/analyze@",
-            "name: Required",
+            "name: Security required",
         ),
         "extended.yml": (
             "python tools/repeat_tests.py --runs 15",

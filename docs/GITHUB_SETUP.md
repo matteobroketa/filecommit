@@ -44,7 +44,7 @@ Create a branch ruleset targeting `main` with these controls:
 - stale approvals are dismissed after new commits;
 - all review conversations must be resolved;
 - the branch must be current before merge;
-- required checks are `CI / Required` and `Security / Required`;
+- required checks are `CI / CI required` and `Security / Security required`;
 - force pushes and branch deletion are blocked;
 - linear history is required;
 - administrators should not bypass the rules during ordinary work.

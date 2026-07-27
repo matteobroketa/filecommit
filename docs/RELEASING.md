@@ -8,8 +8,8 @@ upload production distributions.
 1. Merge all intended changes through `main`.
 2. Update the project version, package `__version__`, and dated changelog entry.
 3. Run `python tools/ci.py all` where development tools are installed.
-4. Merge the release-preparation pull request after `CI / Required` and
-   `Security / Required` pass.
+4. Merge the release-preparation pull request after `CI / CI required` and
+   `Security / Security required` pass.
 5. Confirm the latest scheduled extended validation has no unexplained failure.
 
 ## Publish

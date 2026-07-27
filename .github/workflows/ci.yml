@@ -184,7 +184,7 @@ jobs:
         run: python tools/stress_atomicity.py --writers 12 --replacements 80 --payload-size 96000
 
   required:
-    name: Required
+    name: CI required
     if: always()
     needs: [repository, quality, tests, coverage, package, stress]
     runs-on: ubuntu-latest
