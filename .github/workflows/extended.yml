@@ -120,7 +120,7 @@ jobs:
         shell: bash
         run: |
           if test -d /dev/shm && test -w /dev/shm; then
-            probe_root="$(mktemp -d /dev/shm/filecommit-probe.XXXXXX)"
+            probe_root="$(mktemp -d /dev/shm/atomicreplace-probe.XXXXXX)"
             trap 'rmdir "$probe_root"' EXIT
             python tools/filesystem_probe.py "$probe_root" > filesystem-probe-tmpfs.json
           else
@@ -153,7 +153,7 @@ jobs:
       - name: Install package and build frontend
         run: python -m pip install . build==1.5.0
       - name: Record non-blocking performance evidence
-        run: python tools/benchmark_filecommit.py --json-output benchmark.json
+        run: python tools/benchmark_atomicreplace.py --json-output benchmark.json
       - name: Upload benchmark evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

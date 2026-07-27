@@ -25,29 +25,29 @@ import tempfile
 from pathlib import Path
 
 before = set(Path.cwd().iterdir())
-import filecommit
+import atomicreplace
 after = set(Path.cwd().iterdir())
 assert before == after, "import created files in the consumer directory"
 
-snapshot = json.loads(Path(os.environ["FILECOMMIT_SNAPSHOT"]).read_text(encoding="utf-8"))
-assert filecommit.__version__ == snapshot["version"]
-assert filecommit.__all__ == snapshot["exports"]
+snapshot = json.loads(Path(os.environ["ATOMICREPLACE_SNAPSHOT"]).read_text(encoding="utf-8"))
+assert atomicreplace.__version__ == snapshot["version"]
+assert atomicreplace.__all__ == snapshot["exports"]
 for name, signature in snapshot["signatures"].items():
-    assert str(inspect.signature(getattr(filecommit, name))) == signature
+    assert str(inspect.signature(getattr(atomicreplace, name))) == signature
 
-distribution = importlib.metadata.distribution("filecommit")
-assert any(str(item).replace("\\", "/").endswith("filecommit/py.typed")
+distribution = importlib.metadata.distribution("atomicreplace")
+assert any(str(item).replace("\\", "/").endswith("atomicreplace/py.typed")
            for item in (distribution.files or [])), "py.typed is not installed"
 for requirement in distribution.metadata.get_all("Requires-Dist", []):
     assert "extra == 'dev'" in requirement or 'extra == "dev"' in requirement
 
 with tempfile.TemporaryDirectory() as directory:
     root = Path(directory)
-    readme = Path(os.environ["FILECOMMIT_README"]).read_text(encoding="utf-8")
+    readme = Path(os.environ["ATOMICREPLACE_README"]).read_text(encoding="utf-8")
     examples = [
         example
         for example in re.findall(r"```python" + "\n" + r"(.*?)```", readme, flags=re.DOTALL)
-        if example.startswith("from filecommit")
+        if example.startswith("from atomicreplace")
     ]
     assert len(examples) == 2, "README Python examples changed without consumer validation"
     previous_directory = Path.cwd()
@@ -63,10 +63,10 @@ with tempfile.TemporaryDirectory() as directory:
     configuration = root / "settings.toml"
     manifest = root / "manifest.json"
     artifact = root / "artifact.bin"
-    filecommit.replace_text(configuration, "enabled = true\n")
-    with filecommit.atomic_open(manifest, "w", permissions=0o600) as stream:
+    atomicreplace.replace_text(configuration, "enabled = true\n")
+    with atomicreplace.atomic_open(manifest, "w", permissions=0o600) as stream:
         stream.write('{"files": ["artifact.bin"]}\n')
-    filecommit.replace_bytes(artifact, memoryview(b"\x00\x01consumer"))
+    atomicreplace.replace_bytes(artifact, memoryview(b"\x00\x01consumer"))
     assert configuration.read_text(encoding="utf-8") == "enabled = true\n"
     assert manifest.read_text(encoding="utf-8").startswith("{")
     assert artifact.read_bytes() == b"\x00\x01consumer"
@@ -85,7 +85,7 @@ def validate(wheel: Path, snapshot: Path) -> None:
     snapshot = snapshot.resolve()
     if not snapshot.is_file():
         raise ValueError(f"snapshot does not exist: {snapshot}")
-    with tempfile.TemporaryDirectory(prefix="filecommit-consumer-") as directory:
+    with tempfile.TemporaryDirectory(prefix="atomicreplace-consumer-") as directory:
         environment = Path(directory) / "venv"
         venv.EnvBuilder(with_pip=True, clear=True).create(environment)
         python = _environment_python(environment)
@@ -105,8 +105,8 @@ def validate(wheel: Path, snapshot: Path) -> None:
         consumer_directory = Path(directory) / "consumer"
         consumer_directory.mkdir()
         environment_variables = os.environ.copy()
-        environment_variables["FILECOMMIT_SNAPSHOT"] = str(snapshot)
-        environment_variables["FILECOMMIT_README"] = str(
+        environment_variables["ATOMICREPLACE_SNAPSHOT"] = str(snapshot)
+        environment_variables["ATOMICREPLACE_README"] = str(
             Path(__file__).resolve().parents[1] / "README.md"
         )
         subprocess.run(

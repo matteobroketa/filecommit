@@ -1,1 +1,1 @@
-"""Repository maintenance tools for filecommit."""
+"""Repository maintenance tools for atomicreplace."""

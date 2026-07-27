@@ -160,8 +160,8 @@ def _ensure_durability_supported(path: PathValue, durability: Durability) -> Non
 def _temporary_name_parts(path: PathValue) -> tuple[PathValue, PathValue, PathValue]:
     parent = os.path.dirname(path)
     if isinstance(path, bytes):
-        return parent, b".filecommit-", b".tmp"
-    return parent, ".filecommit-", ".tmp"
+        return parent, b".atomicreplace-", b".tmp"
+    return parent, ".atomicreplace-", ".tmp"
 
 
 def _windows_target_lock_key(path: PathValue) -> str:

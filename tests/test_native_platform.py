@@ -12,7 +12,7 @@ from pathlib import Path
 
 from _capabilities import create_symlink_or_skip, long_path_or_skip, unix_socket_or_skip
 
-from filecommit import UnsafeTargetError, replace_bytes, replace_text
+from atomicreplace import UnsafeTargetError, replace_bytes, replace_text
 
 
 class NativePlatformTests(unittest.TestCase):
@@ -24,7 +24,7 @@ class NativePlatformTests(unittest.TestCase):
         self.temporary_directory.cleanup()
 
     def staging_files(self) -> list[str]:
-        return glob.glob(str(self.root / ".filecommit-*.tmp"))
+        return glob.glob(str(self.root / ".atomicreplace-*.tmp"))
 
     def test_directory_symlink_target_is_refused_without_staging_file(self) -> None:
         destination = self.root / "destination"

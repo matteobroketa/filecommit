@@ -1,10 +1,10 @@
-# filecommit
+# atomicreplace
 
-`filecommit` performs explicit, same-directory, atomic file replacement using
+`atomicreplace` performs explicit, same-directory, atomic file replacement using
 only the Python standard library.
 
 ```python
-from filecommit import replace_text
+from atomicreplace import replace_text
 
 rendered_settings = "enabled = true\n"
 replace_text("settings.toml", rendered_settings, durability="data")
@@ -13,7 +13,7 @@ replace_text("settings.toml", rendered_settings, durability="data")
 Or write incrementally:
 
 ```python
-from filecommit import atomic_open
+from atomicreplace import atomic_open
 
 rendered_manifest = '{"files": []}\n'
 with atomic_open("manifest.json", "w", permissions=0o600) as file:
@@ -26,7 +26,7 @@ file is created beside the target and committed with `os.replace()`.
 ## Install
 
 ```console
-python -m pip install filecommit
+python -m pip install atomicreplace
 ```
 
 Python 3.9 or newer is supported. Runtime dependencies: none.
@@ -85,7 +85,7 @@ provide weaker behavior than the host operating-system API suggests.
   use by the same thread is supported and the outer successful replacement wins.
   This implementation safety mechanism neither coordinates other processes nor
   provides locking or compare-and-swap semantics for logical updates.
-- A process terminated before replacement can leave a `.filecommit-*.tmp`
+- A process terminated before replacement can leave a `.atomicreplace-*.tmp`
   staging file in the target directory. Existing target data remains untouched.
 
 The containing directory must be trusted. No path-based API can defend a file

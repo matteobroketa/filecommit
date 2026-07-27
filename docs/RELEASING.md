@@ -17,7 +17,7 @@ upload production distributions.
 Create and push an annotated tag matching the version:
 
 ```console
-git tag -a v1.2.3 -m "filecommit 1.2.3"
+git tag -a v1.2.3 -m "atomicreplace 1.2.3"
 git push origin v1.2.3
 ```
 

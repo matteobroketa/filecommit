@@ -1,4 +1,4 @@
-"""Public exceptions raised by :mod:`filecommit`."""
+"""Public exceptions raised by :mod:`atomicreplace`."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ PathValue = Union[str, bytes]
 _NOT_SUPPORTED = getattr(errno, "ENOTSUP", getattr(errno, "EOPNOTSUPP", errno.EINVAL))
 
 
-class FileCommitError(OSError):
-    """Base class for filecommit-specific operating-system errors."""
+class AtomicReplaceError(OSError):
+    """Base class for atomicreplace-specific operating-system errors."""
 
 
-class UnsafeTargetError(FileCommitError):
+class UnsafeTargetError(AtomicReplaceError):
     """Raised when replacing the target would have surprising semantics."""
 
     def __init__(self, path: PathValue, reason: str) -> None:
@@ -23,7 +23,7 @@ class UnsafeTargetError(FileCommitError):
         super().__init__(errno.EINVAL, reason, path)
 
 
-class UnsupportedDurabilityError(FileCommitError):
+class UnsupportedDurabilityError(AtomicReplaceError):
     """Raised before writing when the requested durability is unsupported."""
 
     def __init__(self, path: PathValue, reason: str) -> None:
@@ -32,7 +32,7 @@ class UnsupportedDurabilityError(FileCommitError):
         super().__init__(_NOT_SUPPORTED, reason, path)
 
 
-class DirectorySyncError(FileCommitError):
+class DirectorySyncError(AtomicReplaceError):
     """Raised when the file was replaced but its directory could not be synced.
 
     ``committed`` is always true. The target already contains the new data, but
@@ -55,5 +55,5 @@ class CleanupWarning(RuntimeWarning):
         self.temporary_path = temporary_path
         self.cause = cause
         super().__init__(
-            f"could not remove filecommit staging file {os.fsdecode(temporary_path)!r}: {cause}"
+            f"could not remove atomicreplace staging file {os.fsdecode(temporary_path)!r}: {cause}"
         )

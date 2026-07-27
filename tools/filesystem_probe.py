@@ -1,4 +1,4 @@
-"""Characterize filecommit behavior on one filesystem without modifying user files."""
+"""Characterize atomicreplace behavior on one filesystem without modifying user files."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ import threading
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-from filecommit import UnsafeTargetError, replace_bytes, replace_text
+from atomicreplace import UnsafeTargetError, replace_bytes, replace_text
 
 
 class ProbeContractError(RuntimeError):
-    """Raised when a required filecommit contract is violated by a probe."""
+    """Raised when a required atomicreplace contract is violated by a probe."""
 
 
 def _record(results: dict[str, dict[str, Any]], name: str, **values: Any) -> None:
@@ -52,7 +52,7 @@ def _probe_reader_visibility(target: Path) -> dict[str, Any]:
                 stop.set()
                 return
 
-    thread = threading.Thread(target=reader, name="filecommit-filesystem-probe-reader")
+    thread = threading.Thread(target=reader, name="atomicreplace-filesystem-probe-reader")
     thread.start()
     try:
         for index in range(20):
@@ -72,7 +72,7 @@ def _probe_crash_orphan(root: Path) -> dict[str, Any]:
     target.write_text("old", encoding="utf-8")
     script = (
         "import os\n"
-        "from filecommit import atomic_open\n"
+        "from atomicreplace import atomic_open\n"
         f"with atomic_open({str(target)!r}, 'w') as stream:\n"
         "    stream.write('new')\n"
         "    stream.flush()\n"
@@ -89,7 +89,7 @@ def _probe_crash_orphan(root: Path) -> dict[str, Any]:
     )
     if result.returncode != 23 or target.read_text(encoding="utf-8") != "old":
         raise ProbeContractError("pre-replacement crash changed the target")
-    orphans = sorted(path.name for path in root.glob(".filecommit-*.tmp"))
+    orphans = sorted(path.name for path in root.glob(".atomicreplace-*.tmp"))
     for orphan in orphans:
         (root / orphan).unlink()
     return {"status": "supported", "orphan_paths": orphans}
@@ -123,10 +123,10 @@ def run(directory: Path) -> dict[str, Any]:
         }
     report["filesystem"]["platform_release"] = platform.release()
 
-    with tempfile.TemporaryDirectory(prefix="filecommit-probe-", dir=directory) as temporary:
+    with tempfile.TemporaryDirectory(prefix="atomicreplace-probe-", dir=directory) as temporary:
         root = Path(temporary)
         target = root / "target.bin"
-        descriptor, staging = tempfile.mkstemp(prefix=".filecommit-probe-", suffix=".tmp", dir=root)
+        descriptor, staging = tempfile.mkstemp(prefix=".atomicreplace-probe-", suffix=".tmp", dir=root)
         os.close(descriptor)
         Path(staging).unlink()
         _record(results, "same_directory_temporary", status="supported")
@@ -200,7 +200,7 @@ def run(directory: Path) -> dict[str, Any]:
 
 
 def _human_report(report: dict[str, Any]) -> str:
-    lines = [f"filecommit filesystem probe: {report['directory']}"]
+    lines = [f"atomicreplace filesystem probe: {report['directory']}"]
     for name, observation in report["observations"].items():
         lines.append(f"- {name}: {observation['status']}")
     return "\n".join(lines)

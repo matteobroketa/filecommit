@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, Sequence, Union
 from unittest import mock
 
-from filecommit import Durability, UnsafeTargetError, atomic_open, replace_bytes, replace_text
+from atomicreplace import Durability, UnsafeTargetError, atomic_open, replace_bytes, replace_text
 
 DEFAULT_SEEDS = (0xF11EC0, 0xB17E5, 0xC0FFEE, 0x5EED)
 EXTENDED_SEEDS = tuple(range(16))
@@ -183,7 +183,7 @@ def _run_case(
             def failing_fdopen(fd: int, *arguments: object, **keywords: object) -> _FailingFlush:
                 return _FailingFlush(real_fdopen(fd, *arguments, **keywords), error)
 
-            with mock.patch("filecommit._core.os.fdopen", side_effect=failing_fdopen):
+            with mock.patch("atomicreplace._core.os.fdopen", side_effect=failing_fdopen):
                 try:
                     replace_text(path, "new", newline="")
                 except OSError as observed:
@@ -193,7 +193,7 @@ def _run_case(
                     raise AssertionError(f"seed={seed} case={case}: flush failure did not raise")
         elif operation == "sync failure":
             error = OSError("model sync failure")
-            with mock.patch("filecommit._core.os.fsync", side_effect=error):
+            with mock.patch("atomicreplace._core.os.fsync", side_effect=error):
                 try:
                     replace_text(path, "new", newline="", durability=Durability.DATA)
                 except OSError as observed:
@@ -203,7 +203,7 @@ def _run_case(
                     raise AssertionError(f"seed={seed} case={case}: sync failure did not raise")
         elif operation == "replace failure":
             error = OSError("model replacement failure")
-            with mock.patch("filecommit._core.os.replace", side_effect=error):
+            with mock.patch("atomicreplace._core.os.replace", side_effect=error):
                 try:
                     replace_text(path, "new", newline="")
                 except OSError as observed:
@@ -239,7 +239,7 @@ def run(seeds: Sequence[int], *, cases: int) -> None:
         raise ValueError("cases must be positive")
     for seed in seeds:
         randomizer = random.Random(seed)
-        with tempfile.TemporaryDirectory(prefix="filecommit-model-") as directory:
+        with tempfile.TemporaryDirectory(prefix="atomicreplace-model-") as directory:
             root = Path(directory)
             state = _ModelState()
             for case in range(cases):

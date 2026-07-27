@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 from unittest import mock
 
-from filecommit import Durability, atomic_open
+from atomicreplace import Durability, atomic_open
 
 _EXIT_CODE = 23
 
@@ -39,7 +39,7 @@ def run(target: Path, point: str, signal_path: Path) -> None:
 
     if point == "after-staging":
         with mock.patch(
-            "filecommit._core.os.fdopen", side_effect=lambda *_args, **_kwargs: signal_and_exit()
+            "atomicreplace._core.os.fdopen", side_effect=lambda *_args, **_kwargs: signal_and_exit()
         ):
             with atomic_open(target, "w", durability=Durability.DATA):
                 pass
@@ -55,7 +55,7 @@ def run(target: Path, point: str, signal_path: Path) -> None:
         ) -> _SignalAfterFlush:
             return _SignalAfterFlush(real_fdopen(fd, *arguments, **keywords), signal_and_exit)
 
-        with mock.patch("filecommit._core.os.fdopen", side_effect=signal_after_flush):
+        with mock.patch("atomicreplace._core.os.fdopen", side_effect=signal_after_flush):
             with atomic_open(target, "w", durability=Durability.DATA) as stream:
                 stream.write("new")
     elif point == "after-file-sync":
@@ -65,11 +65,11 @@ def run(target: Path, point: str, signal_path: Path) -> None:
             real_fsync(fd)
             signal_and_exit()
 
-        with mock.patch("filecommit._core.os.fsync", side_effect=signal_after_file_sync):
+        with mock.patch("atomicreplace._core.os.fsync", side_effect=signal_after_file_sync):
             with atomic_open(target, "w", durability=Durability.DATA) as stream:
                 stream.write("new")
     elif point == "after-permissions":
-        from filecommit import _core
+        from atomicreplace import _core
 
         real_apply_permissions = _core._apply_permissions
 
@@ -78,12 +78,12 @@ def run(target: Path, point: str, signal_path: Path) -> None:
             signal_and_exit()
 
         with mock.patch(
-            "filecommit._core._apply_permissions", side_effect=signal_after_permissions
+            "atomicreplace._core._apply_permissions", side_effect=signal_after_permissions
         ):
             with atomic_open(target, "w", durability=Durability.DATA) as stream:
                 stream.write("new")
     elif point in {"before-replace", "after-replace"}:
-        from filecommit import _core
+        from atomicreplace import _core
 
         real_replace = _core._replace
 
@@ -93,11 +93,11 @@ def run(target: Path, point: str, signal_path: Path) -> None:
             real_replace(staging, destination)
             signal_and_exit()
 
-        with mock.patch("filecommit._core._replace", side_effect=signal_around_replace):
+        with mock.patch("atomicreplace._core._replace", side_effect=signal_around_replace):
             with atomic_open(target, "w", durability=Durability.DATA) as stream:
                 stream.write("new")
     elif point in {"before-directory-sync", "after-directory-sync"}:
-        from filecommit import _core
+        from atomicreplace import _core
 
         real_sync_directory = _core._sync_parent_directory
 
@@ -108,7 +108,7 @@ def run(target: Path, point: str, signal_path: Path) -> None:
             signal_and_exit()
 
         with mock.patch(
-            "filecommit._core._sync_parent_directory", side_effect=signal_around_directory_sync
+            "atomicreplace._core._sync_parent_directory", side_effect=signal_around_directory_sync
         ):
             with atomic_open(target, "w", durability=Durability.FULL) as stream:
                 stream.write("new")

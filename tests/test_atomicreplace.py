@@ -11,8 +11,8 @@ import warnings
 from pathlib import Path
 from unittest import mock
 
-import filecommit
-from filecommit import (
+import atomicreplace
+from atomicreplace import (
     DirectorySyncError,
     Durability,
     UnsafeTargetError,
@@ -20,10 +20,10 @@ from filecommit import (
     replace_bytes,
     replace_text,
 )
-from filecommit._core import _WINDOWS_TARGET_LOCKS, _replace, _windows_target_lock_key
+from atomicreplace._core import _WINDOWS_TARGET_LOCKS, _replace, _windows_target_lock_key
 
 
-class FileCommitTests(unittest.TestCase):
+class AtomicReplaceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary_directory.name)
@@ -34,7 +34,7 @@ class FileCommitTests(unittest.TestCase):
         self.temporary_directory.cleanup()
 
     def staging_files(self) -> list[str]:
-        return glob.glob(str(self.root / ".filecommit-*.tmp"))
+        return glob.glob(str(self.root / ".atomicreplace-*.tmp"))
 
     def test_replace_bytes_creates_file(self) -> None:
         target = self.root / "payload.bin"
@@ -292,7 +292,7 @@ class FileCommitTests(unittest.TestCase):
         target = self.root / "target.txt"
         target.write_text("old", encoding="utf-8")
         error = PermissionError(errno.EACCES, "blocked")
-        with mock.patch("filecommit._core.os.replace", side_effect=error):
+        with mock.patch("atomicreplace._core.os.replace", side_effect=error):
             with self.assertRaises(PermissionError):
                 replace_text(target, "new")
         self.assertEqual(target.read_text(encoding="utf-8"), "old")
@@ -302,7 +302,7 @@ class FileCommitTests(unittest.TestCase):
         target = self.root / "target.txt"
         target.write_text("old", encoding="utf-8")
         error = OSError(errno.EIO, "sync failed")
-        with mock.patch("filecommit._core.os.fsync", side_effect=error):
+        with mock.patch("atomicreplace._core.os.fsync", side_effect=error):
             with self.assertRaises(OSError) as raised:
                 replace_text(target, "new", durability="data")
         self.assertIs(raised.exception, error)
@@ -313,7 +313,7 @@ class FileCommitTests(unittest.TestCase):
         if os.name != "posix":
             self.skipTest("full durability is POSIX-only")
         target = self.root / "target.txt"
-        with mock.patch("filecommit._core._sync_parent_directory") as sync_directory:
+        with mock.patch("atomicreplace._core._sync_parent_directory") as sync_directory:
             replace_text(target, "new", durability=Durability.FULL)
         sync_directory.assert_called_once_with(os.path.abspath(target))
         self.assertEqual(target.read_text(encoding="utf-8"), "new")
@@ -324,7 +324,7 @@ class FileCommitTests(unittest.TestCase):
         target = self.root / "target.txt"
         target.write_text("old", encoding="utf-8")
         cause = OSError(errno.EIO, "directory sync failed")
-        with mock.patch("filecommit._core._sync_parent_directory", side_effect=cause):
+        with mock.patch("atomicreplace._core._sync_parent_directory", side_effect=cause):
             with self.assertRaises(DirectorySyncError) as raised:
                 replace_text(target, "new", durability="full")
         self.assertTrue(raised.exception.committed)
@@ -334,7 +334,7 @@ class FileCommitTests(unittest.TestCase):
 
     def test_none_durability_does_not_call_fsync(self) -> None:
         target = self.root / "target.txt"
-        with mock.patch("filecommit._core.os.fsync") as fsync:
+        with mock.patch("atomicreplace._core.os.fsync") as fsync:
             replace_text(target, "new", durability="none")
         fsync.assert_not_called()
 
@@ -347,7 +347,7 @@ class FileCommitTests(unittest.TestCase):
             calls.append(fd)
             real_fsync(fd)
 
-        with mock.patch("filecommit._core.os.fsync", side_effect=record):
+        with mock.patch("atomicreplace._core.os.fsync", side_effect=record):
             replace_text(target, "new", durability="data")
         self.assertEqual(len(calls), 1)
 
@@ -414,7 +414,7 @@ class FileCommitTests(unittest.TestCase):
             except BaseException as error:
                 errors.append(error)
 
-        reader_thread = threading.Thread(target=reader, name="filecommit-reader")
+        reader_thread = threading.Thread(target=reader, name="atomicreplace-reader")
         writer_threads = [threading.Thread(target=writer, args=(payload,)) for payload in payloads]
         reader_thread.start()
         self.assertTrue(reader_started.wait(5))
@@ -452,8 +452,8 @@ class FileCommitTests(unittest.TestCase):
                 errors.append(error)
 
         with target.open("rb") as reader:
-            with mock.patch("filecommit._core.os.replace", side_effect=record_real_replacement):
-                writer_thread = threading.Thread(target=writer, name="filecommit-writer")
+            with mock.patch("atomicreplace._core.os.replace", side_effect=record_real_replacement):
+                writer_thread = threading.Thread(target=writer, name="atomicreplace-writer")
                 writer_thread.start()
                 self.assertTrue(replacement_was_blocked.wait(5))
                 reader.close()
@@ -478,10 +478,10 @@ class FileCommitTests(unittest.TestCase):
                 raise error
             real_replace(source, destination)
 
-        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
-            with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
-                with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
-                    with mock.patch("filecommit._core.time.sleep") as sleep:
+        with mock.patch("atomicreplace._core._windows_replace_retries_enabled", return_value=True):
+            with mock.patch("atomicreplace._core.os.replace", side_effect=fail_once):
+                with mock.patch("atomicreplace._core.time.monotonic", side_effect=(0.0, 0.0)):
+                    with mock.patch("atomicreplace._core.time.sleep") as sleep:
                         _replace(staging, target)
         self.assertEqual(calls, 2)
         sleep.assert_called_once_with(0.005)
@@ -504,10 +504,10 @@ class FileCommitTests(unittest.TestCase):
                 raise error
             real_replace(source, destination)
 
-        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
-            with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
-                with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
-                    with mock.patch("filecommit._core.time.sleep"):
+        with mock.patch("atomicreplace._core._windows_replace_retries_enabled", return_value=True):
+            with mock.patch("atomicreplace._core.os.replace", side_effect=fail_once):
+                with mock.patch("atomicreplace._core.time.monotonic", side_effect=(0.0, 0.0)):
+                    with mock.patch("atomicreplace._core.time.sleep"):
                         _replace(staging, target)
 
         self.assertEqual(os.name, actual_os_name)
@@ -535,11 +535,11 @@ class FileCommitTests(unittest.TestCase):
                     real_replace(source, destination)
 
                 with mock.patch(
-                    "filecommit._core._windows_replace_retries_enabled", return_value=True
+                    "atomicreplace._core._windows_replace_retries_enabled", return_value=True
                 ):
-                    with mock.patch("filecommit._core.os.replace", side_effect=fail_once):
-                        with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0)):
-                            with mock.patch("filecommit._core.time.sleep") as sleep:
+                    with mock.patch("atomicreplace._core.os.replace", side_effect=fail_once):
+                        with mock.patch("atomicreplace._core.time.monotonic", side_effect=(0.0, 0.0)):
+                            with mock.patch("atomicreplace._core.time.sleep") as sleep:
                                 _replace(staging, target)
                 self.assertEqual(calls, 2)
                 sleep.assert_called_once_with(0.005)
@@ -551,9 +551,9 @@ class FileCommitTests(unittest.TestCase):
         staging.write_text("new", encoding="utf-8")
         error = PermissionError(errno.EACCES, "permanent failure")
         error.winerror = 87
-        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
-            with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
-                with mock.patch("filecommit._core.time.sleep") as sleep:
+        with mock.patch("atomicreplace._core._windows_replace_retries_enabled", return_value=True):
+            with mock.patch("atomicreplace._core.os.replace", side_effect=error) as replace:
+                with mock.patch("atomicreplace._core.time.sleep") as sleep:
                     with self.assertRaises(PermissionError) as raised:
                         _replace(staging, target)
         self.assertIs(raised.exception, error)
@@ -565,9 +565,9 @@ class FileCommitTests(unittest.TestCase):
         staging = self.root / "staging.txt"
         staging.write_text("new", encoding="utf-8")
         error = PermissionError(errno.EACCES, "unclassified failure")
-        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
-            with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
-                with mock.patch("filecommit._core.time.sleep") as sleep:
+        with mock.patch("atomicreplace._core._windows_replace_retries_enabled", return_value=True):
+            with mock.patch("atomicreplace._core.os.replace", side_effect=error) as replace:
+                with mock.patch("atomicreplace._core.time.sleep") as sleep:
                     with self.assertRaises(PermissionError) as raised:
                         _replace(staging, target)
         self.assertIs(raised.exception, error)
@@ -580,17 +580,17 @@ class FileCommitTests(unittest.TestCase):
         staging.write_text("new", encoding="utf-8")
         error = PermissionError(errno.EACCES, "sharing violation")
         error.winerror = 5
-        with mock.patch("filecommit._core._windows_replace_retries_enabled", return_value=True):
-            with mock.patch("filecommit._core.os.replace", side_effect=error) as replace:
-                with mock.patch("filecommit._core.time.monotonic", side_effect=(0.0, 0.0, 5.0)):
-                    with mock.patch("filecommit._core.time.sleep") as sleep:
+        with mock.patch("atomicreplace._core._windows_replace_retries_enabled", return_value=True):
+            with mock.patch("atomicreplace._core.os.replace", side_effect=error) as replace:
+                with mock.patch("atomicreplace._core.time.monotonic", side_effect=(0.0, 0.0, 5.0)):
+                    with mock.patch("atomicreplace._core.time.sleep") as sleep:
                         with self.assertRaises(PermissionError) as raised:
                             _replace(staging, target)
         self.assertIs(raised.exception, error)
         self.assertEqual(replace.call_count, 2)
         sleep.assert_called_once_with(0.005)
 
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_same_target_writers_serialize_and_registry_is_reclaimed(
         self, _locks: object
     ) -> None:
@@ -639,7 +639,7 @@ class FileCommitTests(unittest.TestCase):
         alias = self.root / "target.txt"
         self.assertEqual(_windows_target_lock_key(target), _windows_target_lock_key(alias))
 
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_nested_same_target_write_is_reentrant_and_outer_commit_wins(
         self, _locks: object
     ) -> None:
@@ -650,7 +650,7 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "outer")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_interrupted_lock_acquisition_reclaims_registry_reference(
         self, _locks: object
     ) -> None:
@@ -668,13 +668,13 @@ class FileCommitTests(unittest.TestCase):
                 self.references = 0
 
         entry = Entry()
-        with mock.patch("filecommit._core._TargetLock", return_value=entry):
+        with mock.patch("atomicreplace._core._TargetLock", return_value=entry):
             with self.assertRaisesRegex(KeyboardInterrupt, "interrupted"):
                 atomic_open(self.root / "target.txt").__enter__()
         self.assertEqual(entry.references, 0)
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_different_targets_can_progress_concurrently(self, _locks: object) -> None:
         first_target = self.root / "first.txt"
         second_target = self.root / "second.txt"
@@ -715,7 +715,7 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_relative_and_absolute_aliases_share_a_lock(self, _locks: object) -> None:
         previous_directory = os.getcwd()
         first_entered = threading.Event()
@@ -762,10 +762,10 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
     @mock.patch(
-        "filecommit._core._windows_target_lock_key",
+        "atomicreplace._core._windows_target_lock_key",
         side_effect=lambda path: os.fsdecode(path).casefold(),
     )
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_case_variants_share_a_lock(self, _locks: object, _lock_key: object) -> None:
         target = self.root / "Target.TXT"
         alias = self.root / "target.txt"
@@ -807,7 +807,7 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(alias.read_text(encoding="utf-8"), "second")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_lock_is_released_after_body_exception(self, _locks: object) -> None:
         target = self.root / "target.txt"
         with self.assertRaisesRegex(RuntimeError, "body"):
@@ -819,7 +819,7 @@ class FileCommitTests(unittest.TestCase):
         self.assertEqual(target.read_text(encoding="utf-8"), "replacement")
         self.assertEqual(_WINDOWS_TARGET_LOCKS, {})
 
-    @mock.patch("filecommit._core._windows_target_locks_enabled", return_value=True)
+    @mock.patch("atomicreplace._core._windows_target_locks_enabled", return_value=True)
     def test_windows_lock_registry_does_not_grow_for_historical_targets(
         self, _locks: object
     ) -> None:
@@ -830,7 +830,7 @@ class FileCommitTests(unittest.TestCase):
     def test_cleanup_failure_does_not_mask_body_exception(self) -> None:
         target = self.root / "target.txt"
         body_error = RuntimeError("body failed")
-        with mock.patch("filecommit._core.os.unlink", side_effect=PermissionError("blocked")):
+        with mock.patch("atomicreplace._core.os.unlink", side_effect=PermissionError("blocked")):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 with self.assertRaises(RuntimeError) as raised:
@@ -838,7 +838,7 @@ class FileCommitTests(unittest.TestCase):
                         staged.write("new")
                         raise body_error
         self.assertIs(raised.exception, body_error)
-        self.assertTrue(any(isinstance(item.message, filecommit.CleanupWarning) for item in caught))
+        self.assertTrue(any(isinstance(item.message, atomicreplace.CleanupWarning) for item in caught))
 
     def test_api_validation(self) -> None:
         target = self.root / "target.txt"
@@ -871,14 +871,14 @@ class FileCommitTests(unittest.TestCase):
         self.assertFalse(target.exists())
 
     def test_public_exports_are_stable_and_versioned(self) -> None:
-        self.assertEqual(filecommit.__version__, "0.1.0")
+        self.assertEqual(atomicreplace.__version__, "0.1.0")
         self.assertEqual(
-            set(filecommit.__all__),
+            set(atomicreplace.__all__),
             {
                 "CleanupWarning",
                 "DirectorySyncError",
                 "Durability",
-                "FileCommitError",
+                "AtomicReplaceError",
                 "UnsupportedDurabilityError",
                 "UnsafeTargetError",
                 "atomic_open",

@@ -9,7 +9,7 @@ final repository owner and URL.
 From PowerShell in the repository root:
 
 ```powershell
-py tools/configure_repository.py YOUR_GITHUB_NAME/filecommit
+py tools/configure_repository.py YOUR_GITHUB_NAME/atomicreplace
 py tools/ci.py validate
 ```
 
@@ -97,7 +97,7 @@ The environment name is part of the Trusted Publisher identity and must match
 In the PyPI project settings, add a GitHub Trusted Publisher with:
 
 - owner: the GitHub account or organization;
-- repository: `filecommit`;
+- repository: `atomicreplace`;
 - workflow: `release.yml`;
 - environment: `pypi`.
 
@@ -116,7 +116,7 @@ py tools/ci.py all
 Update these three values in one pull request:
 
 - `[project].version` in `pyproject.toml`;
-- `__version__` in `src/filecommit/__init__.py`;
+- `__version__` in `src/atomicreplace/__init__.py`;
 - the dated release section in `CHANGELOG.md`.
 
 After the protected pull request is merged and both required checks pass:
@@ -124,7 +124,7 @@ After the protected pull request is merged and both required checks pass:
 ```powershell
 git switch main
 git pull --ff-only
-git tag -a v0.1.0 -m "filecommit 0.1.0"
+git tag -a v0.1.0 -m "atomicreplace 0.1.0"
 git push origin v0.1.0
 ```
 

@@ -9,7 +9,7 @@ from typing import Iterable, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = ROOT / "pyproject.toml"
-PACKAGE_INIT = ROOT / "src" / "filecommit" / "__init__.py"
+PACKAGE_INIT = ROOT / "src" / "atomicreplace" / "__init__.py"
 CHANGELOG = ROOT / "CHANGELOG.md"
 REPOSITORY_PLACEHOLDER = "https://github.com/OWNER/REPOSITORY"
 
@@ -89,7 +89,7 @@ def package_version(path: Path = PACKAGE_INIT) -> str:
             if isinstance(value, ast.Constant) and isinstance(value.value, str):
                 return value.value
             raise ProjectError("__version__ must be assigned a string literal")
-    raise ProjectError("src/filecommit/__init__.py must define __version__")
+    raise ProjectError("src/atomicreplace/__init__.py must define __version__")
 
 
 def changelog_section(version: str, path: Path = CHANGELOG) -> str:

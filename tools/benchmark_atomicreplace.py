@@ -1,4 +1,4 @@
-"""Characterize filecommit performance without enforcing elapsed-time thresholds."""
+"""Characterize atomicreplace performance without enforcing elapsed-time thresholds."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence
 
-from filecommit import Durability, FileCommitError, replace_bytes
+from atomicreplace import Durability, AtomicReplaceError, replace_bytes
 
 _PAYLOAD_SIZES = (0, 1024, 64 * 1024, 1024 * 1024, 16 * 1024 * 1024)
 
@@ -76,7 +76,7 @@ def _contended(root: Path, payload: bytes, same_target: bool) -> None:
 def _wheel_size() -> dict[str, Any]:
     """Build a wheel in a temporary directory when the optional frontend exists."""
 
-    with tempfile.TemporaryDirectory(prefix="filecommit-benchmark-wheel-") as directory:
+    with tempfile.TemporaryDirectory(prefix="atomicreplace-benchmark-wheel-") as directory:
         output = Path(directory)
         source = Path(__file__).resolve().parents[1]
         checkout = output / "source"
@@ -111,11 +111,11 @@ def run(*, samples: int, payload_sizes: Sequence[int] = _PAYLOAD_SIZES) -> dict[
         "wheel_size": _wheel_size(),
         "windows_retry": {"status": "not_forced", "reason": "native handle contention only"},
     }
-    with tempfile.TemporaryDirectory(prefix="filecommit-benchmark-") as directory:
+    with tempfile.TemporaryDirectory(prefix="atomicreplace-benchmark-") as directory:
         root = Path(directory)
         import_start = time.perf_counter()
         imported = subprocess.run(
-            [sys.executable, "-I", "-c", "import filecommit"], check=False, capture_output=True
+            [sys.executable, "-I", "-c", "import atomicreplace"], check=False, capture_output=True
         )
         report["isolated_import"] = (
             {"status": "measured", "seconds": time.perf_counter() - import_start}
@@ -134,7 +134,7 @@ def run(*, samples: int, payload_sizes: Sequence[int] = _PAYLOAD_SIZES) -> dict[
                         samples,
                         payload_size,
                     )
-                except (FileCommitError, OSError) as error:
+                except (AtomicReplaceError, OSError) as error:
                     result = {"status": "unsupported", "error": repr(error)}
                 else:
                     result["status"] = "measured"

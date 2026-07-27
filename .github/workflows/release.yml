@@ -176,7 +176,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: pypi
-      url: https://pypi.org/p/filecommit/${{ needs.gate.outputs.version }}
+      url: https://pypi.org/p/atomicreplace/${{ needs.gate.outputs.version }}
     permissions:
       id-token: write
     steps:
@@ -222,6 +222,6 @@ jobs:
               artifact/dist/* \
               artifact/release/SHA256SUMS.txt \
               --verify-tag \
-              --title "filecommit ${{ needs.gate.outputs.version }}" \
+              --title "atomicreplace ${{ needs.gate.outputs.version }}" \
               --notes-file artifact/release/RELEASE_NOTES.md
           fi

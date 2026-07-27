@@ -3,14 +3,14 @@ requires = ["setuptools==82.0.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "filecommit"
+name = "atomicreplace"
 version = "0.1.0"
 description = "Explicit, dependency-free atomic file replacement for Python"
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{name = "filecommit contributors"}]
+authors = [{name = "atomicreplace contributors"}]
 keywords = ["atomic", "filesystem", "durability", "files", "safe-write"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -38,10 +38,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/matteobroketa/filecommit"
-Repository = "https://github.com/matteobroketa/filecommit"
-Issues = "https://github.com/matteobroketa/filecommit/issues"
-Changelog = "https://github.com/matteobroketa/filecommit/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/matteobroketa/atomicreplace"
+Repository = "https://github.com/matteobroketa/atomicreplace"
+Issues = "https://github.com/matteobroketa/atomicreplace/issues"
+Changelog = "https://github.com/matteobroketa/atomicreplace/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -50,7 +50,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-filecommit = ["py.typed"]
+atomicreplace = ["py.typed"]
 
 [tool.ruff]
 target-version = "py39"
@@ -66,12 +66,12 @@ ignore = ["SIM105", "SIM117"]
 # remains enforced by the hosted runtime matrix and repository syntax validator.
 python_version = "3.10"
 strict = true
-files = ["src/filecommit"]
+files = ["src/atomicreplace"]
 exclude = ["build", "dist"]
 
 [tool.coverage.run]
 branch = true
-source = ["filecommit"]
+source = ["atomicreplace"]
 
 [tool.coverage.report]
 fail_under = 95

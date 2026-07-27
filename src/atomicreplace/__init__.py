@@ -4,7 +4,7 @@ from ._core import Durability, atomic_open, replace_bytes, replace_text
 from ._errors import (
     CleanupWarning,
     DirectorySyncError,
-    FileCommitError,
+    AtomicReplaceError,
     UnsafeTargetError,
     UnsupportedDurabilityError,
 )
@@ -13,7 +13,7 @@ __all__ = [
     "CleanupWarning",
     "DirectorySyncError",
     "Durability",
-    "FileCommitError",
+    "AtomicReplaceError",
     "UnsafeTargetError",
     "UnsupportedDurabilityError",
     "atomic_open",

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from filecommit import atomic_open, replace_bytes, replace_text
+from atomicreplace import atomic_open, replace_bytes, replace_text
 
 target = Path("consumer.txt")
 replace_text(target, "configuration", durability="data")

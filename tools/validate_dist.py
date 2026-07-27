@@ -20,10 +20,10 @@ _FORBIDDEN_PARTS = {"__pycache__", ".git", ".github", "tests", "tools"}
 _FORBIDDEN_SUFFIXES = {".pyc", ".pyo"}
 _FORBIDDEN_NAMES = {".coverage", ".env", ".envrc", "id_rsa", "id_ed25519"}
 _EXPECTED_WHEEL_FILES = {
-    "filecommit/__init__.py",
-    "filecommit/_core.py",
-    "filecommit/_errors.py",
-    "filecommit/py.typed",
+    "atomicreplace/__init__.py",
+    "atomicreplace/_core.py",
+    "atomicreplace/_errors.py",
+    "atomicreplace/py.typed",
 }
 _EXPECTED_SDIST_FILES = {
     "CHANGELOG.md",
@@ -34,10 +34,10 @@ _EXPECTED_SDIST_FILES = {
     "SECURITY.md",
     "VALIDATION.md",
     "pyproject.toml",
-    "src/filecommit/__init__.py",
-    "src/filecommit/_core.py",
-    "src/filecommit/_errors.py",
-    "src/filecommit/py.typed",
+    "src/atomicreplace/__init__.py",
+    "src/atomicreplace/_core.py",
+    "src/atomicreplace/_errors.py",
+    "src/atomicreplace/py.typed",
 }
 
 
@@ -69,7 +69,7 @@ def _validate_requires_dist(message: Message) -> None:
 def validate_wheel(path: Path, *, version: str) -> None:
     """Validate wheel layout, metadata, and dependency policy."""
 
-    expected_name = f"filecommit-{version}-py3-none-any.whl"
+    expected_name = f"atomicreplace-{version}-py3-none-any.whl"
     if path.name != expected_name:
         raise DistributionValidationError(f"unexpected wheel filename: {path.name}")
 
@@ -83,7 +83,7 @@ def validate_wheel(path: Path, *, version: str) -> None:
 
         metadata_name, wheel_name = _wheel_metadata(archive)
         message = BytesParser().parsebytes(archive.read(metadata_name))
-        if message["Name"] != "filecommit":
+        if message["Name"] != "atomicreplace":
             raise DistributionValidationError("wheel metadata has the wrong project name")
         if message["Version"] != version:
             raise DistributionValidationError("wheel metadata version does not match the project")
@@ -112,10 +112,10 @@ def validate_wheel(path: Path, *, version: str) -> None:
 def validate_sdist(path: Path, *, version: str) -> None:
     """Validate source archive layout and required release files."""
 
-    expected_name = f"filecommit-{version}.tar.gz"
+    expected_name = f"atomicreplace-{version}.tar.gz"
     if path.name != expected_name:
         raise DistributionValidationError(f"unexpected source archive filename: {path.name}")
-    prefix = f"filecommit-{version}/"
+    prefix = f"atomicreplace-{version}/"
 
     with tarfile.open(path, "r:gz") as archive:
         members = archive.getmembers()

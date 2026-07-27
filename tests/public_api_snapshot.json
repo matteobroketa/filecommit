@@ -3,7 +3,7 @@
     "CleanupWarning",
     "DirectorySyncError",
     "Durability",
-    "FileCommitError",
+    "AtomicReplaceError",
     "UnsafeTargetError",
     "UnsupportedDurabilityError",
     "atomic_open",

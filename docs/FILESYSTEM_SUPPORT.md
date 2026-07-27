@@ -7,7 +7,7 @@ modifies, or deletes unrelated entries in the supplied directory.
 
 The table is an evidence index, not a portability promise. A successful probe
 describes one mounted filesystem, operating system, Python build, and runner at
-one point in time. `filecommit` continues to treat the containing directory,
+one point in time. `atomicreplace` continues to treat the containing directory,
 operating system, filesystem, and hardware as trust boundaries.
 
 | Environment | Evidence | Status | Scope and limitation |
@@ -20,6 +20,6 @@ operating system, filesystem, and hardware as trust boundaries.
 
 The probe treats failed replacement, mixed reader visibility, unexpected target
 changes after a pre-replacement crash, and unsafe-link acceptance as violated
-`filecommit` contracts. Filesystem features that the platform does not expose,
+`atomicreplace` contracts. Filesystem features that the platform does not expose,
 such as symlink creation or directory synchronization, are recorded as
 unsupported and do not make the probe fail.

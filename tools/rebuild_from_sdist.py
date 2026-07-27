@@ -62,7 +62,7 @@ def rebuild(sdist: Path, reference_wheel: Path) -> None:
 
     sdist = sdist.resolve()
     reference_wheel = reference_wheel.resolve()
-    with tempfile.TemporaryDirectory(prefix="filecommit-sdist-") as directory:
+    with tempfile.TemporaryDirectory(prefix="atomicreplace-sdist-") as directory:
         root = Path(directory)
         source = root / "source"
         output = root / "dist"

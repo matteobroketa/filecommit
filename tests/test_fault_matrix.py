@@ -13,7 +13,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest import mock
 
-from filecommit import CleanupWarning, DirectorySyncError, atomic_open, replace_text
+from atomicreplace import CleanupWarning, DirectorySyncError, atomic_open, replace_text
 
 
 class _FailingStream:
@@ -56,7 +56,7 @@ class TransactionFaultMatrixTests(unittest.TestCase):
         self.temporary_directory.cleanup()
 
     def staging_files(self) -> list[str]:
-        return glob.glob(str(self.root / ".filecommit-*.tmp"))
+        return glob.glob(str(self.root / ".atomicreplace-*.tmp"))
 
     def _failing_fdopen(self, method: str, error: OSError) -> mock._patch:
         real_fdopen = os.fdopen
@@ -64,7 +64,7 @@ class TransactionFaultMatrixTests(unittest.TestCase):
         def open_failing_stream(fd: int, *_args: object, **_kwargs: object) -> _FailingStream:
             return _FailingStream(real_fdopen(fd, "w", encoding="utf-8"), method, error)
 
-        return mock.patch("filecommit._core.os.fdopen", side_effect=open_failing_stream)
+        return mock.patch("atomicreplace._core.os.fdopen", side_effect=open_failing_stream)
 
     def test_precommit_fault_matrix_preserves_old_target_and_cleans_staging(self) -> None:
         cases = (
@@ -91,15 +91,15 @@ class TransactionFaultMatrixTests(unittest.TestCase):
                 with ExitStack() as stack:
                     if boundary == "initial target inspection":
                         stack.enter_context(
-                            mock.patch("filecommit._core._validate_target", side_effect=error)
+                            mock.patch("atomicreplace._core._validate_target", side_effect=error)
                         )
                     elif boundary == "temporary creation":
                         stack.enter_context(
-                            mock.patch("filecommit._core.tempfile.mkstemp", side_effect=error)
+                            mock.patch("atomicreplace._core.tempfile.mkstemp", side_effect=error)
                         )
                     elif boundary == "descriptor-to-stream wrapping":
                         stack.enter_context(
-                            mock.patch("filecommit._core.os.fdopen", side_effect=error)
+                            mock.patch("atomicreplace._core.os.fdopen", side_effect=error)
                         )
                     elif boundary == "user write":
                         stack.enter_context(self._failing_fdopen("write", error))
@@ -107,27 +107,27 @@ class TransactionFaultMatrixTests(unittest.TestCase):
                         stack.enter_context(self._failing_fdopen("flush", error))
                     elif boundary == "file synchronization":
                         stack.enter_context(
-                            mock.patch("filecommit._core.os.fsync", side_effect=error)
+                            mock.patch("atomicreplace._core.os.fsync", side_effect=error)
                         )
                     elif boundary == "final target revalidation":
                         stack.enter_context(
                             mock.patch(
-                                "filecommit._core._validate_target", side_effect=(None, error)
+                                "atomicreplace._core._validate_target", side_effect=(None, error)
                             )
                         )
                     elif boundary == "permission calculation":
                         stack.enter_context(
-                            mock.patch("filecommit._core.stat.S_IMODE", side_effect=error)
+                            mock.patch("atomicreplace._core.stat.S_IMODE", side_effect=error)
                         )
                     elif boundary == "permission application":
                         stack.enter_context(
-                            mock.patch("filecommit._core._apply_permissions", side_effect=error)
+                            mock.patch("atomicreplace._core._apply_permissions", side_effect=error)
                         )
                     elif boundary == "stream close":
                         stack.enter_context(self._failing_fdopen("close", error))
                     elif boundary == "replacement":
                         stack.enter_context(
-                            mock.patch("filecommit._core.os.replace", side_effect=error)
+                            mock.patch("atomicreplace._core.os.replace", side_effect=error)
                         )
 
                     with self.assertRaises(OSError) as raised:
@@ -143,7 +143,7 @@ class TransactionFaultMatrixTests(unittest.TestCase):
         body_error = RuntimeError("body failed")
         real_unlink = os.unlink
 
-        with mock.patch("filecommit._core.os.unlink", side_effect=PermissionError("blocked")):
+        with mock.patch("atomicreplace._core.os.unlink", side_effect=PermissionError("blocked")):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
                 with self.assertRaises(RuntimeError) as raised:
@@ -190,7 +190,7 @@ class TransactionFaultMatrixTests(unittest.TestCase):
 
                         stack.enter_context(
                             mock.patch(
-                                "filecommit._core.os.open", side_effect=fail_parent_directory_open
+                                "atomicreplace._core.os.open", side_effect=fail_parent_directory_open
                             )
                         )
                     elif boundary == "parent directory synchronization":
@@ -210,7 +210,7 @@ class TransactionFaultMatrixTests(unittest.TestCase):
                                 raise directory_error
 
                         stack.enter_context(
-                            mock.patch("filecommit._core.os.fsync", side_effect=fail_directory_sync)
+                            mock.patch("atomicreplace._core.os.fsync", side_effect=fail_directory_sync)
                         )
                     else:
                         real_close = os.close
@@ -225,7 +225,7 @@ class TransactionFaultMatrixTests(unittest.TestCase):
 
                         stack.enter_context(
                             mock.patch(
-                                "filecommit._core.os.close", side_effect=fail_directory_close
+                                "atomicreplace._core.os.close", side_effect=fail_directory_close
                             )
                         )
 

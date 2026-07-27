@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from filecommit import replace_text
+from atomicreplace import replace_text
 
 _HELPER = Path(__file__).with_name("crash_helper.py")
 _EXIT_CODE = 23
@@ -26,7 +26,7 @@ class CrashBoundaryTests(unittest.TestCase):
         self.temporary_directory.cleanup()
 
     def staging_files(self) -> list[Path]:
-        return [Path(path) for path in glob.glob(str(self.root / ".filecommit-*.tmp"))]
+        return [Path(path) for path in glob.glob(str(self.root / ".atomicreplace-*.tmp"))]
 
     def _crash(self, point: str) -> Path:
         target = self.root / f"{point}.txt"

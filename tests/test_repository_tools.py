@@ -45,11 +45,11 @@ class ProjectMetadataTests(unittest.TestCase):
                 f'Issues = "{REPOSITORY_PLACEHOLDER}/issues"\n',
                 encoding="utf-8",
             )
-            self.assertTrue(configure("example/filecommit", path))
+            self.assertTrue(configure("example/atomicreplace", path))
             configured = path.read_text(encoding="utf-8")
             self.assertNotIn("OWNER/REPOSITORY", configured)
-            self.assertEqual(configured.count("https://github.com/example/filecommit"), 2)
-            self.assertFalse(configure("example/filecommit", path))
+            self.assertEqual(configured.count("https://github.com/example/atomicreplace"), 2)
+            self.assertFalse(configure("example/atomicreplace", path))
 
     def test_repository_configuration_rejects_ambiguous_names(self) -> None:
         with self.assertRaises(ValueError):
@@ -119,11 +119,11 @@ class DistributionToolTests(unittest.TestCase):
         self.assertTrue(_forbidden("package/.github/workflows/release.yml"))
         self.assertTrue(_forbidden("package/tests/test_api.py"))
         self.assertTrue(_forbidden("package/secret-token.txt"))
-        self.assertFalse(_forbidden("package/src/filecommit/_core.py"))
+        self.assertFalse(_forbidden("package/src/atomicreplace/_core.py"))
 
     def test_consumer_script_checks_import_side_effects_and_typed_marker(self) -> None:
         self.assertIn("import created files", _CONSUMER)
-        self.assertIn("filecommit/py.typed", _CONSUMER)
+        self.assertIn("atomicreplace/py.typed", _CONSUMER)
 
     def test_checksum_output_is_sorted_and_correct(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

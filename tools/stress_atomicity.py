@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Optional, Sequence
 
-from filecommit import replace_bytes
+from atomicreplace import replace_bytes
 
 _FRAME_SIZE = 32
 _TRANSIENT_WINDOWS_ERRORS = frozenset((5, 32, 33))
@@ -126,7 +126,7 @@ def run(
         raise ValueError("mode must be 'same' or 'different'")
 
     context = multiprocessing.get_context("spawn")
-    with tempfile.TemporaryDirectory(prefix="filecommit-stress-") as directory:
+    with tempfile.TemporaryDirectory(prefix="atomicreplace-stress-") as directory:
         root = Path(directory)
         targets = (
             (root / "stress.bin",)
@@ -141,7 +141,7 @@ def run(
             context.Process(
                 target=_reader,
                 args=(tuple(map(str, targets)), stop, start, errors, index),
-                name=f"filecommit-reader-{index}",
+                name=f"atomicreplace-reader-{index}",
             )
             for index in range(readers)
         ]
@@ -156,7 +156,7 @@ def run(
                     errors,
                     index,
                 ),
-                name=f"filecommit-writer-{index}",
+                name=f"atomicreplace-writer-{index}",
             )
             for index, payload in enumerate(payloads)
         ]
@@ -186,7 +186,7 @@ def run(
             for target, payload in zip(targets, payloads):
                 if target.read_bytes() != payload:
                     raise AssertionError(f"final target differs from its writer payload: {target}")
-        if list(root.glob(".filecommit-*.tmp")):
+        if list(root.glob(".atomicreplace-*.tmp")):
             raise AssertionError("successful stress run left staging files")
 
 

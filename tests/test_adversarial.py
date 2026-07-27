@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from filecommit import (
+from atomicreplace import (
     UnsafeTargetError,
     UnsupportedDurabilityError,
     atomic_open,
@@ -29,7 +29,7 @@ class AdversarialTests(unittest.TestCase):
         self.temporary_directory.cleanup()
 
     def staging_files(self) -> list[Path]:
-        return list(self.root.glob(".filecommit-*.tmp"))
+        return list(self.root.glob(".atomicreplace-*.tmp"))
 
     def test_context_exit_before_enter_is_rejected_without_side_effects(self) -> None:
         target = self.root / "target.txt"
@@ -74,7 +74,7 @@ class AdversarialTests(unittest.TestCase):
         def failing_fdopen(fd: int, *_args: object, **_kwargs: object) -> FailingCloseFile:
             return FailingCloseFile(real_fdopen(fd, "w", encoding="utf-8"))
 
-        with mock.patch("filecommit._core.os.fdopen", side_effect=failing_fdopen):
+        with mock.patch("atomicreplace._core.os.fdopen", side_effect=failing_fdopen):
             with self.assertRaises(RuntimeError) as raised:
                 with atomic_open(target, "w") as staged:
                     staged.write("new")
@@ -113,8 +113,8 @@ class AdversarialTests(unittest.TestCase):
             self.assertTrue(opened[0].closed)  # type: ignore[union-attr]
             real_unlink(path)
 
-        with mock.patch("filecommit._core.os.fdopen", side_effect=tracked_fdopen):
-            with mock.patch("filecommit._core.os.unlink", side_effect=assert_closed_then_unlink):
+        with mock.patch("atomicreplace._core.os.fdopen", side_effect=tracked_fdopen):
+            with mock.patch("atomicreplace._core.os.unlink", side_effect=assert_closed_then_unlink):
                 with self.assertRaisesRegex(RuntimeError, "body"):
                     with atomic_open(target, "w") as staged:
                         staged.write("new")
@@ -139,7 +139,7 @@ class AdversarialTests(unittest.TestCase):
         target = self.root / "target.bin"
         for result in (None, 0, -1):
             with self.subTest(result=result):
-                with mock.patch("filecommit._core.atomic_open", return_value=FakeContext(result)):
+                with mock.patch("atomicreplace._core.atomic_open", return_value=FakeContext(result)):
                     with self.assertRaises(OSError):
                         replace_bytes(target, b"content")
 
@@ -160,7 +160,7 @@ class AdversarialTests(unittest.TestCase):
         target = self.root / "target.txt"
         for result in (None, 0, -1):
             with self.subTest(result=result):
-                with mock.patch("filecommit._core.atomic_open", return_value=FakeContext(result)):
+                with mock.patch("atomicreplace._core.atomic_open", return_value=FakeContext(result)):
                     with self.assertRaises(OSError):
                         replace_text(target, "content")
 
@@ -176,7 +176,7 @@ class AdversarialTests(unittest.TestCase):
         target = self.root / "target.txt"
         target.write_text("old", encoding="utf-8")
         cause = OSError(errno.EPERM, "chmod failed")
-        with mock.patch("filecommit._core._apply_permissions", side_effect=cause):
+        with mock.patch("atomicreplace._core._apply_permissions", side_effect=cause):
             with self.assertRaises(OSError) as raised:
                 replace_text(target, "new")
         self.assertIs(raised.exception, cause)
@@ -196,8 +196,8 @@ class AdversarialTests(unittest.TestCase):
                 raise PermissionError(errno.EACCES, "read-only")
             real_unlink(path)
 
-        with mock.patch("filecommit._core.os.replace", side_effect=PermissionError("blocked")):
-            with mock.patch("filecommit._core.os.unlink", side_effect=fail_once):
+        with mock.patch("atomicreplace._core.os.replace", side_effect=PermissionError("blocked")):
+            with mock.patch("atomicreplace._core.os.unlink", side_effect=fail_once):
                 with self.assertRaises(PermissionError):
                     replace_text(target, "new", permissions=0o444)
         self.assertEqual(calls, 2)
@@ -240,7 +240,7 @@ class AdversarialTests(unittest.TestCase):
 
     def test_unsupported_full_durability_fails_before_staging(self) -> None:
         target = self.root / "target.txt"
-        with mock.patch("filecommit._core._full_durability_supported", return_value=False):
+        with mock.patch("atomicreplace._core._full_durability_supported", return_value=False):
             with self.assertRaises(UnsupportedDurabilityError):
                 with atomic_open(target, "w", durability="full"):
                     pass
@@ -260,7 +260,7 @@ class AdversarialTests(unittest.TestCase):
             staged.write("new")
             [temporary_path] = self.staging_files()
             self.assertEqual(temporary_path.parent, self.root)
-            self.assertTrue(temporary_path.name.startswith(".filecommit-"))
+            self.assertTrue(temporary_path.name.startswith(".atomicreplace-"))
 
     def test_noncontiguous_memoryview_is_supported(self) -> None:
         target = self.root / "target.bin"
@@ -304,7 +304,7 @@ class AdversarialTests(unittest.TestCase):
         script = textwrap.dedent(
             f"""
             import os
-            from filecommit import atomic_open
+            from atomicreplace import atomic_open
 
             with atomic_open({str(target)!r}, "w") as staged:
                 staged.write("new")

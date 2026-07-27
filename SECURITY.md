@@ -1,8 +1,8 @@
 # Security policy and threat model
 
-## What filecommit protects
+## What atomicreplace protects
 
-`filecommit` prevents a target path from exposing a partially written staged
+`atomicreplace` prevents a target path from exposing a partially written staged
 version when normal Python execution fails before `os.replace()` completes.
 The existing target remains untouched while the staging file is written.
 
@@ -32,9 +32,9 @@ than local filesystems.
 ## Sensitive data
 
 A process terminated before replacement can leave a private
-`.filecommit-*.tmp` staging file containing the new data. Applications writing
+`.atomicreplace-*.tmp` staging file containing the new data. Applications writing
 secrets must place targets in a private directory and should have an
-application-specific orphan-cleanup policy. `filecommit` deliberately does not
+application-specific orphan-cleanup policy. `atomicreplace` deliberately does not
 provide a global cleanup function because deleting files selected only by a
 name pattern would create its own security risk.
 

@@ -15,9 +15,9 @@ import importlib.metadata
 import tempfile
 from pathlib import Path
 
-from filecommit import Durability, atomic_open, replace_bytes, replace_text
+from atomicreplace import Durability, atomic_open, replace_bytes, replace_text
 
-metadata = importlib.metadata.metadata("filecommit")
+metadata = importlib.metadata.metadata("atomicreplace")
 for requirement in metadata.get_all("Requires-Dist", []):
     if 'extra == "dev"' not in requirement and "extra == 'dev'" not in requirement:
         raise AssertionError(f"runtime dependency found: {requirement}")
@@ -59,7 +59,7 @@ def smoke_test(wheel: Path) -> None:
     wheel = resolve_wheel(wheel).resolve()
     if not wheel.is_file() or wheel.suffix != ".whl":
         raise ValueError(f"not a wheel: {wheel}")
-    with tempfile.TemporaryDirectory(prefix="filecommit-smoke-") as directory:
+    with tempfile.TemporaryDirectory(prefix="atomicreplace-smoke-") as directory:
         environment = Path(directory) / "venv"
         venv.EnvBuilder(with_pip=True, clear=True).create(environment)
         python = _environment_python(environment)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from tools.benchmark_filecommit import _percentile, run
+from tools.benchmark_atomicreplace import _percentile, run
 
 
 class BenchmarkTests(unittest.TestCase):

@@ -42,7 +42,7 @@ class FilesystemProbeTests(unittest.TestCase):
                 self.assertEqual(filesystem_probe.main([directory]), 0)
             report = json.loads(stdout.getvalue())
             self.assertIn("observations", report)
-            self.assertIn("filecommit filesystem probe:", stderr.getvalue())
+            self.assertIn("atomicreplace filesystem probe:", stderr.getvalue())
 
     def test_invalid_directory_raises_a_clear_error(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

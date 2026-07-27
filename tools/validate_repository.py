@@ -137,7 +137,7 @@ def _validate_workflow_architecture(errors: list[str]) -> None:
             "python tools/stress_atomicity.py",
             "python tools/filesystem_probe.py . > filesystem-probe.json",
             "filesystem-probe*.json",
-            "python tools/benchmark_filecommit.py --json-output benchmark.json",
+            "python tools/benchmark_atomicreplace.py --json-output benchmark.json",
             "benchmark.json",
             "--compare-directory dist-second",
         ),
