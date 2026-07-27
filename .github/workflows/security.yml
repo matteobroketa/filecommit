@@ -81,7 +81,7 @@ jobs:
           category: /language:${{ matrix.language }}
 
   required:
-    name: Required
+    name: Security required
     if: always()
     needs: [workflow-policy, dependency-review, codeql]
     runs-on: ubuntu-latest
